@@ -17,6 +17,10 @@ class Player extends SpriteComponent
   double holdTimer = 0;
   double holdDelay = 0.15; // tiempo entre saltos de carril al dejar presionado
 
+  bool get isOnLeftExtremeLane => lane == 0;
+  bool get isOnRightExtremeLane => lane == game.lanes.length - 1;
+  bool get isOnExtremeLane => isOnLeftExtremeLane || isOnRightExtremeLane;
+
   @override
   Future<void> onLoad() async {
     // Cargar sprite y configurar tamaño
