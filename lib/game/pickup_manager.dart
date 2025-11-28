@@ -7,6 +7,7 @@ import '../components/obstacle.dart';
 import '../components/player.dart';
 import '../main.dart';
 import 'fuel_manager.dart';
+import '../components/gold_coin.dart';
 
 class PickupManager extends Component with HasGameRef<MyGame> {
   final Random _rand = Random();
@@ -35,6 +36,7 @@ class PickupManager extends Component with HasGameRef<MyGame> {
     if (spawnTimer >= spawnInterval) {
       spawnTimer = 0;
       _spawnFuelPickup();
+      _spawnCoin();
     }
   }
 
@@ -63,6 +65,26 @@ class PickupManager extends Component with HasGameRef<MyGame> {
 
     // Ajustar próximo intervalo de spawn
     spawnInterval = 1.2 + _rand.nextDouble() * 0.9;
+  }
+
+  void _spawnCoin() {
+    if (lanes.isEmpty) return;
+
+    final laneIndex = _rand.nextInt(lanes.length);
+    final laneX = lanes[laneIndex];
+
+    // mismo bloqueo que bidones
+    if (!_laneIsFree(laneX)) {
+      spawnTimer = spawnInterval - 0.1;
+      return;
+    }
+
+    final coin = GoldCoin(position: Vector2(laneX, -50));
+
+    gameRef.add(coin);
+
+    // usa el MISMO sistema de intervalos que tus bidones
+    spawnInterval = 1.0 + _rand.nextDouble() * 0.6;
   }
 
   bool _laneIsFree(double laneX) {

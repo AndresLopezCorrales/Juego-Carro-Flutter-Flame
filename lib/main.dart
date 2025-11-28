@@ -39,6 +39,9 @@ class MyGame extends FlameGame
   // Fondos centrales
   late SpriteComponent centerBg1, centerBg2;
 
+  int score = 0;
+  double _scoreTimer = 0; // contador interno
+
   @override
   Future<void> onLoad() async {
     await super.onLoad();
@@ -152,6 +155,13 @@ class MyGame extends FlameGame
     if (timePassed >= 1.0) {
       difficultyMultiplier += difficultyIncreaseRate;
       timePassed = 0.0;
+    }
+
+    _scoreTimer += dt;
+    if (_scoreTimer >= 1.0) {
+      score += 10; // +10 puntos por segundo
+      print("Puntos: $score");
+      _scoreTimer = 0; // reiniciar
     }
 
     if (fuelManager.isEmpty) pauseEngine();
