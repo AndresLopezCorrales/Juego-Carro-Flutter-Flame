@@ -11,12 +11,13 @@ class Player extends SpriteComponent
   int lane = 0;
   late List<double> lanePositions;
 
-  // AGREGAR ESTA PROPIEDAD
   bool canMove = true;
 
   // Movimiento por teclado
   bool holdingLeft = false;
   bool holdingRight = false;
+  bool holdingUp = false;
+  bool holdingDown = false;
   double holdTimer = 0;
   double holdDelay = 0.15;
 
@@ -34,52 +35,85 @@ class Player extends SpriteComponent
     width = maxWidth;
     height = maxWidth * ratio;
 
+    // ROTAR EL COCHE EN MODO HORIZONTAL
+    if (gameRef.isHorizontalMode) {
+      angle = 1.5708; // 90 grados en radianes (π/2)
+    }
+
     add(RectangleHitbox());
   }
 
   void setLanePositions(List<double> lanes) {
     lanePositions = lanes;
     lane = (lanes.length / 2).floor();
-    x = lanePositions[lane];
+
+    if (gameRef.isHorizontalMode) {
+      y = lanePositions[lane];
+    } else {
+      x = lanePositions[lane];
+    }
   }
 
   @override
   void update(double dt) {
     super.update(dt);
 
-    x = lanePositions[lane];
+    if (gameRef.isHorizontalMode) {
+      y = lanePositions[lane];
+    } else {
+      x = lanePositions[lane];
+    }
 
-    // AGREGAR ESTA VERIFICACIÓN
-    if (canMove && (holdingLeft || holdingRight)) {
+    if (canMove) {
       holdTimer += dt;
 
       if (holdTimer >= holdDelay) {
         holdTimer = 0;
 
-        if (holdingLeft) moveLeft();
-        if (holdingRight) moveRight();
+        if (gameRef.isHorizontalMode) {
+          if (holdingUp) moveUp();
+          if (holdingDown) moveDown();
+        } else {
+          if (holdingLeft) moveLeft();
+          if (holdingRight) moveRight();
+        }
       }
     }
   }
 
   @override
   bool onKeyEvent(KeyEvent event, Set<LogicalKeyboardKey> keysPressed) {
-    // AGREGAR ESTA VERIFICACIÓN
     if (!canMove) return true;
 
     if (event is KeyDownEvent) {
-      if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
-        holdingLeft = true;
-        holdingRight = false;
-        moveLeft();
-        holdTimer = 0;
-      }
+      if (gameRef.isHorizontalMode) {
+        if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+          holdingUp = true;
+          holdingDown = false;
+          moveUp();
+          holdTimer = 0;
+        }
 
-      if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
-        holdingRight = true;
-        holdingLeft = false;
-        moveRight();
-        holdTimer = 0;
+        if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+          holdingDown = true;
+          holdingUp = false;
+          moveDown();
+          holdTimer = 0;
+        }
+      } else {
+        if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+          holdingLeft = true;
+          holdingRight = false;
+          moveLeft();
+          holdTimer = 0;
+        }
+
+        if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+          holdingRight = true;
+          holdingLeft = false;
+          moveRight();
+          holdTimer = 0;
+        }
       }
     }
 
@@ -88,9 +122,16 @@ class Player extends SpriteComponent
         holdingLeft = false;
         holdTimer = 0;
       }
-
       if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
         holdingRight = false;
+        holdTimer = 0;
+      }
+      if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+        holdingUp = false;
+        holdTimer = 0;
+      }
+      if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+        holdingDown = false;
         holdTimer = 0;
       }
     }
@@ -99,27 +140,43 @@ class Player extends SpriteComponent
   }
 
   void moveLeft() {
-    // AGREGAR ESTA VERIFICACIÓN
     if (canMove && lane > 0) lane--;
   }
 
   void moveRight() {
-    // AGREGAR ESTA VERIFICACIÓN
+    if (canMove && lane < lanePositions.length - 1) lane++;
+  }
+
+  void moveUp() {
+    if (canMove && lane > 0) lane--;
+  }
+
+  void moveDown() {
     if (canMove && lane < lanePositions.length - 1) lane++;
   }
 
   @override
   void onTapDown(TapDownEvent event) {
-    // AGREGAR ESTA VERIFICACIÓN
     if (!canMove) return;
 
     final touchX = event.localPosition.x;
     final mid = gameRef.size.x / 2;
 
-    if (touchX < mid) {
-      moveLeft();
+    if (gameRef.isHorizontalMode) {
+      final touchY = event.localPosition.y;
+      final midY = gameRef.size.y / 2;
+
+      if (touchY < midY) {
+        moveUp();
+      } else {
+        moveDown();
+      }
     } else {
-      moveRight();
+      if (touchX < mid) {
+        moveLeft();
+      } else {
+        moveRight();
+      }
     }
   }
 }

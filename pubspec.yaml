@@ -66,6 +66,8 @@ flutter:
     - assets/images/obstaculos/cono.png
     - assets/images/carreteras/calle.png
     - assets/images/power_ups/oro.png
+    - assets/images/escenarios/side_h.png
+    - assets/images/carreteras/calle_h.png
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
 

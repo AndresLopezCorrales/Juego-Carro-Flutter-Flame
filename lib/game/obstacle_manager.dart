@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'package:carreando/components/gold_coin.dart';
 import 'package:flame/components.dart';
 
 import '../components/fuel_pickup.dart';
@@ -13,19 +14,20 @@ class ObstacleManager extends Component with HasGameRef<MyGame> {
   List<double> lanes;
   final FuelManager fuelManager;
   final Player player;
+  final bool isHorizontalMode;
 
   double spawnTimer = 0;
-  double spawnInterval = 0.25; // intervalo inicial de spawneo de obstáculos
+  double spawnInterval = 0.25;
 
   ObstacleManager({
     required this.lanes,
     required this.fuelManager,
     required this.player,
+    this.isHorizontalMode = false,
   });
 
   @override
   void update(double dt) {
-    // Actualizar temporizador y spawnear obstáculos
     super.update(dt);
 
     if (gameRef.paused) return;
@@ -39,48 +41,68 @@ class ObstacleManager extends Component with HasGameRef<MyGame> {
   }
 
   void _spawnObstacle() {
-    // Crear un nuevo obstáculo en un carril aleatorio
-    double x = lanes[_rand.nextInt(lanes.length)];
+    if (lanes.isEmpty) return;
 
-    // Si el carril no está libre, NO intentar acumular spawns
-    if (!_laneIsFree(x)) return;
+    final laneIndex = _rand.nextInt(lanes.length);
 
-    final spawnPos = Vector2(x, -100);
+    if (isHorizontalMode) {
+      // MODO HORIZONTAL: Spawn desde la derecha
+      final spawnY = lanes[laneIndex];
 
-    final obstacle = Obstacle(
-      fuelManager: fuelManager,
-      player: player,
-      startPosition: spawnPos,
-    );
+      if (!_laneIsFree(spawnY, true)) return;
 
-    gameRef.add(obstacle);
+      final obstacle = Obstacle(
+        fuelManager: fuelManager,
+        player: player,
+        startPosition: Vector2(gameRef.size.x + 50, spawnY),
+        isHorizontalMode: true,
+      );
+      gameRef.add(obstacle);
+    } else {
+      // MODO VERTICAL: Spawn desde arriba
+      final laneX = lanes[laneIndex];
+      if (!_laneIsFree(laneX, false)) return;
 
-    // flujo constante y dinámico
+      final obstacle = Obstacle(
+        fuelManager: fuelManager,
+        player: player,
+        startPosition: Vector2(laneX, -100),
+        isHorizontalMode: false,
+      );
+      gameRef.add(obstacle);
+    }
+
     double baseRate = max(0.20, 0.7 - (gameRef.difficultyMultiplier * 0.03));
     spawnInterval = baseRate + _rand.nextDouble() * 0.15;
   }
 
-  bool _laneIsFree(double laneX) {
-    // Verificar si el carril está libre de obstáculos cercanos
+  bool _laneIsFree(double lanePos, bool isHorizontal) {
     double minSeparation = gameRef.laneWidth * 0.8;
 
     for (final c in gameRef.children) {
-      // SOLO revisar obstáculos y pickups
       if (c is! PositionComponent) continue;
       if (c is! SpriteComponent) continue;
 
-      // Ignorar fondo y jugador y otros componentes
       if (c is Player) continue;
-      if (c is FuelPickup) {
+      if (c is FuelPickup || c is GoldCoin) {
         // ok revisar
       } else if (c is! Obstacle) {
         continue;
       }
 
-      // Revisar solo cerca del área de spawn
-      if (c.y < 250) {
-        if ((c.x - laneX).abs() < minSeparation) {
-          return false;
+      if (isHorizontal) {
+        // En horizontal: revisar área de spawn a la derecha
+        if (c.x > gameRef.size.x - 200) {
+          if ((c.y - lanePos).abs() < minSeparation) {
+            return false;
+          }
+        }
+      } else {
+        // En vertical: revisar área de spawn arriba
+        if (c.y < 250) {
+          if ((c.x - lanePos).abs() < minSeparation) {
+            return false;
+          }
         }
       }
     }

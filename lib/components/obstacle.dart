@@ -7,9 +7,10 @@ import 'player.dart';
 
 class Obstacle extends SpriteComponent
     with CollisionCallbacks, HasGameRef<MyGame> {
-  double speed = 250; // velocidad de caída
+  double speed = 250;
   final FuelManager fuelManager;
   final Player player;
+  final bool isHorizontalMode;
 
   bool hit = false;
 
@@ -17,11 +18,11 @@ class Obstacle extends SpriteComponent
     required this.fuelManager,
     required this.player,
     required Vector2 startPosition,
+    this.isHorizontalMode = false,
   }) : super(anchor: Anchor.center, position: startPosition);
 
   @override
   Future<void> onLoad() async {
-    // Cargar sprite y configurar tamaño
     sprite = await Sprite.load('obstaculos/cono.png');
 
     double maxWidth = gameRef.laneWidth * 0.55;
@@ -34,17 +35,21 @@ class Obstacle extends SpriteComponent
 
   @override
   void update(double dt) {
-    // Mover obstáculo hacia abajo
     super.update(dt);
 
-    y += speed * gameRef.difficultyMultiplier * dt;
-
-    if (y > gameRef.size.y + height) removeFromParent();
+    if (isHorizontalMode) {
+      // MODO HORIZONTAL: Mover de derecha a izquierda
+      x -= speed * gameRef.difficultyMultiplier * dt;
+      if (x < -width) removeFromParent();
+    } else {
+      // MODO VERTICAL: Mover de arriba a abajo
+      y += speed * gameRef.difficultyMultiplier * dt;
+      if (y > gameRef.size.y + height) removeFromParent();
+    }
   }
 
   @override
   void onCollision(Set<Vector2> points, PositionComponent other) {
-    // Manejar colisión con el jugador
     if (hit) return;
     if (other is Player) {
       hit = true;

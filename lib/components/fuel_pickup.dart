@@ -11,16 +11,19 @@ class FuelPickup extends SpriteComponent
   static const double fallSpeed = 200;
 
   final FuelManager fuelManager;
+  final bool isHorizontalMode;
 
-  FuelPickup({required Vector2 position, required this.fuelManager})
-    : super(position: position, anchor: Anchor.center);
+  FuelPickup({
+    required Vector2 position,
+    required this.fuelManager,
+    this.isHorizontalMode = false,
+  }) : super(position: position, anchor: Anchor.center);
 
   @override
   Future<void> onLoad() async {
-    // Cargar sprite y configurar tamaño
     sprite = await gameRef.loadSprite('power_ups/bidon.png');
 
-    double maxWidth = gameRef.laneWidth * 0.45; //más pequeño
+    double maxWidth = gameRef.laneWidth * 0.45;
     double ratio = sprite!.srcSize.y / sprite!.srcSize.x;
 
     size = Vector2(maxWidth, maxWidth * ratio);
@@ -30,17 +33,21 @@ class FuelPickup extends SpriteComponent
 
   @override
   void update(double dt) {
-    // Mover pickup hacia abajo
     super.update(dt);
 
-    y += fallSpeed * gameRef.difficultyMultiplier * dt;
-
-    if (y > gameRef.size.y + height) removeFromParent();
+    if (isHorizontalMode) {
+      // MODO HORIZONTAL: Mover de derecha a izquierda
+      x -= fallSpeed * gameRef.difficultyMultiplier * dt;
+      if (x < -width) removeFromParent();
+    } else {
+      // MODO VERTICAL: Mover de arriba a abajo
+      y += fallSpeed * gameRef.difficultyMultiplier * dt;
+      if (y > gameRef.size.y + height) removeFromParent();
+    }
   }
 
   @override
   void onCollisionStart(Set<Vector2> points, PositionComponent other) {
-    // Manejar colisión con el jugador
     if (other is Player) {
       fuelManager.addFuel(30);
       removeFromParent();

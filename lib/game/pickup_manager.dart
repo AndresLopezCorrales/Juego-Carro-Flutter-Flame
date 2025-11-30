@@ -19,23 +19,24 @@ class PickupManager extends Component with HasGameRef<MyGame> {
   double spawnTimer = 0;
   double spawnInterval;
 
+  final bool isHorizontalMode;
+
   PickupManager({
     required this.lanes,
     required this.player,
     required this.fuelManager,
-    this.spawnInterval = 1.4, // intervalo inicial de spawneo de pickups
+    this.isHorizontalMode = false,
+    this.spawnInterval = 1.4,
   });
 
   @override
   void update(double dt) {
     super.update(dt);
 
-    // No spawnear pickups si el juego terminó
     if (gameRef.isGameOver) {
       return;
     }
 
-    // Actualizar temporizador y spawnear pickups
     spawnTimer += dt;
 
     if (spawnTimer >= spawnInterval) {
@@ -46,82 +47,110 @@ class PickupManager extends Component with HasGameRef<MyGame> {
   }
 
   void _spawnFuelPickup() {
-    // No spawnear si el juego terminó
     if (gameRef.isGameOver) return;
-
-    // Crear un nuevo pickup de gasolina
     if (lanes.isEmpty) return;
 
-    // Elegir carril aleatorio
     final laneIndex = _rand.nextInt(lanes.length);
-    final laneX = lanes[laneIndex];
 
-    // Evitar generar si hay algo cerca en ese carril
-    if (!_laneIsFree(laneX)) {
-      // Reintentar en el siguiente ciclo
-      spawnTimer = spawnInterval - 0.1;
-      return;
+    if (isHorizontalMode) {
+      // MODO HORIZONTAL: Spawn desde la derecha, posición Y según lane
+      final spawnY = lanes[laneIndex];
+
+      if (!_laneIsFree(spawnY, true)) {
+        spawnTimer = spawnInterval - 0.1;
+        return;
+      }
+
+      final pickup = FuelPickup(
+        position: Vector2(gameRef.size.x + 50, spawnY),
+        fuelManager: fuelManager,
+        isHorizontalMode: true,
+      );
+      gameRef.add(pickup);
+    } else {
+      // MODO VERTICAL: Spawn desde arriba, posición X según lane
+      final laneX = lanes[laneIndex];
+      if (!_laneIsFree(laneX, false)) {
+        spawnTimer = spawnInterval - 0.1;
+        return;
+      }
+      final pickup = FuelPickup(
+        position: Vector2(laneX, -50),
+        fuelManager: fuelManager,
+        isHorizontalMode: false,
+      );
+      gameRef.add(pickup);
     }
 
-    // Crear pickup
-    final pickup = FuelPickup(
-      position: Vector2(laneX, -50),
-      fuelManager: fuelManager,
-    );
-
-    gameRef.add(pickup);
-
-    // Ajustar próximo intervalo de spawn
     spawnInterval = 1.2 + _rand.nextDouble() * 0.9;
   }
 
   void _spawnCoin() {
-    // No spawnear si el juego terminó
     if (gameRef.isGameOver) return;
-
     if (lanes.isEmpty) return;
 
     final laneIndex = _rand.nextInt(lanes.length);
-    final laneX = lanes[laneIndex];
 
-    // mismo bloqueo que bidones
-    if (!_laneIsFree(laneX)) {
-      spawnTimer = spawnInterval - 0.1;
-      return;
+    if (isHorizontalMode) {
+      // MODO HORIZONTAL: Spawn desde la derecha
+      final spawnY = lanes[laneIndex];
+
+      if (!_laneIsFree(spawnY, true)) {
+        spawnTimer = spawnInterval - 0.1;
+        return;
+      }
+
+      final coin = GoldCoin(
+        position: Vector2(gameRef.size.x + 50, spawnY),
+        isHorizontalMode: true,
+      );
+      gameRef.add(coin);
+    } else {
+      // MODO VERTICAL: Spawn desde arriba
+      final laneX = lanes[laneIndex];
+      if (!_laneIsFree(laneX, false)) {
+        spawnTimer = spawnInterval - 0.1;
+        return;
+      }
+      final coin = GoldCoin(
+        position: Vector2(laneX, -50),
+        isHorizontalMode: false,
+      );
+      gameRef.add(coin);
     }
 
-    final coin = GoldCoin(position: Vector2(laneX, -50));
-
-    gameRef.add(coin);
-
-    // usa el MISMO sistema de intervalos que tus bidones
     spawnInterval = 1.0 + _rand.nextDouble() * 0.6;
   }
 
-  bool _laneIsFree(double laneX) {
-    // No verificar si el juego terminó (aunque esto probablemente no sea necesario)
+  bool _laneIsFree(double lanePos, bool isHorizontal) {
     if (gameRef.isGameOver) return false;
 
-    // Verificar si el carril está libre de obstáculos cercanos
     double minSeparation = gameRef.laneWidth * 0.8;
 
     for (final c in gameRef.children) {
-      // SOLO revisar obstáculos y pickups
       if (c is! PositionComponent) continue;
       if (c is! SpriteComponent) continue;
 
-      // Ignorar fondo y jugador y otros componentes
       if (c is Player) continue;
-      if (c is FuelPickup) {
+      if (c is FuelPickup || c is GoldCoin) {
         // ok revisar
       } else if (c is! Obstacle) {
         continue;
       }
 
-      // Revisar solo cerca del área de spawn
-      if (c.y < 250) {
-        if ((c.x - laneX).abs() < minSeparation) {
-          return false;
+      if (isHorizontal) {
+        // En horizontal: revisar área de spawn a la derecha
+        if (c.x > gameRef.size.x - 200) {
+          if ((c.y - lanePos).abs() < minSeparation) {
+            return false;
+          }
+        }
+      } else {
+        // En vertical: revisar área de spawn arriba
+        if (c.y < 250) {
+          if ((c.x - lanePos).abs() < minSeparation) {
+            return false;
+          }
         }
       }
     }
