@@ -1,7 +1,7 @@
 import 'package:flame/components.dart';
 import 'package:flame/collisions.dart';
 
-import '../game/fuel_manager.dart';
+import '../managers/fuel_manager.dart';
 import '../main.dart';
 import 'player.dart';
 

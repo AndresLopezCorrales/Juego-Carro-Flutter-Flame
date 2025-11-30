@@ -6,9 +6,9 @@ import 'package:flame/input.dart';
 import 'package:flutter/widgets.dart';
 
 import 'components/player.dart';
-import 'game/fuel_manager.dart';
-import 'game/pickup_manager.dart';
-import 'game/obstacle_manager.dart';
+import 'managers/fuel_manager.dart';
+import 'managers/pickup_manager.dart';
+import 'managers/obstacle_manager.dart';
 
 import 'hud/game_hud.dart';
 
