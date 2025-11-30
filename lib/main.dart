@@ -8,6 +8,8 @@ import 'game/fuel_manager.dart';
 import 'game/pickup_manager.dart';
 import 'game/obstacle_manager.dart';
 
+import 'hud/game_hud.dart';
+
 void main() {
   final game = MyGame();
   runApp(GameWidget(game: game, autofocus: true));
@@ -111,6 +113,14 @@ class MyGame extends FlameGame
       player: player,
     );
     add(obstacleManager);
+
+    // 8. Agregar HUD (después de todos los demás componentes)
+    final hud = GameHUD();
+    await add(hud);
+
+    // Asegurar que el HUD se renderice encima de todo
+    hud.position = Vector2.zero();
+    hud.size = size;
   }
 
   //Background side scrolling setup
