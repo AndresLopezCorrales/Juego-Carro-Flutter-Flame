@@ -28,9 +28,14 @@ class PickupManager extends Component with HasGameRef<MyGame> {
 
   @override
   void update(double dt) {
-    // Actualizar temporizador y spawnear pickups
     super.update(dt);
 
+    // No spawnear pickups si el juego terminó
+    if (gameRef.isGameOver) {
+      return;
+    }
+
+    // Actualizar temporizador y spawnear pickups
     spawnTimer += dt;
 
     if (spawnTimer >= spawnInterval) {
@@ -41,6 +46,9 @@ class PickupManager extends Component with HasGameRef<MyGame> {
   }
 
   void _spawnFuelPickup() {
+    // No spawnear si el juego terminó
+    if (gameRef.isGameOver) return;
+
     // Crear un nuevo pickup de gasolina
     if (lanes.isEmpty) return;
 
@@ -68,6 +76,9 @@ class PickupManager extends Component with HasGameRef<MyGame> {
   }
 
   void _spawnCoin() {
+    // No spawnear si el juego terminó
+    if (gameRef.isGameOver) return;
+
     if (lanes.isEmpty) return;
 
     final laneIndex = _rand.nextInt(lanes.length);
@@ -88,6 +99,9 @@ class PickupManager extends Component with HasGameRef<MyGame> {
   }
 
   bool _laneIsFree(double laneX) {
+    // No verificar si el juego terminó (aunque esto probablemente no sea necesario)
+    if (gameRef.isGameOver) return false;
+
     // Verificar si el carril está libre de obstáculos cercanos
     double minSeparation = gameRef.laneWidth * 0.8;
 

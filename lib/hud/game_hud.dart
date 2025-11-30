@@ -10,6 +10,7 @@ class GameHUD extends PositionComponent with HasGameRef<MyGame> {
 
   GameHUD() {
     _setupTextPaints();
+    priority = 100;
   }
 
   void _setupTextPaints() {
@@ -71,6 +72,7 @@ class GameHUD extends PositionComponent with HasGameRef<MyGame> {
   }
 
   void _renderFuelBar(Canvas canvas) {
+    if (gameRef.fuelManager == null) return;
     // Dimensiones completamente responsivas
     final double barWidth = size.x * 0.35;
     final double barHeight = size.y * 0.025;
@@ -85,7 +87,8 @@ class GameHUD extends PositionComponent with HasGameRef<MyGame> {
     );
 
     // Barra de gasolina (progreso)
-    final fuelPercent = gameRef.fuelManager.fuelPercent;
+
+    final fuelPercent = gameRef.fuelManager!.fuelPercent;
     final fuelWidth = barWidth * fuelPercent.clamp(0.0, 1.0);
 
     if (fuelWidth > 0) {

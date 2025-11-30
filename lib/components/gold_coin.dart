@@ -39,6 +39,12 @@ class GoldCoin extends SpriteComponent
   @override
   void onCollisionStart(Set<Vector2> points, PositionComponent other) {
     if (other is Player) {
+      // VERIFICAR SI EL JUEGO ESTÁ EN GAME OVER
+      if (gameRef.isGameOver) {
+        removeFromParent();
+        return;
+      }
+
       // Aumentar puntuación al recoger
       gameRef.score += 20;
 

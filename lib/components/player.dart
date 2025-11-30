@@ -11,11 +11,14 @@ class Player extends SpriteComponent
   int lane = 0;
   late List<double> lanePositions;
 
+  // AGREGAR ESTA PROPIEDAD
+  bool canMove = true;
+
   // Movimiento por teclado
   bool holdingLeft = false;
   bool holdingRight = false;
   double holdTimer = 0;
-  double holdDelay = 0.15; // tiempo entre saltos de carril al dejar presionado
+  double holdDelay = 0.15;
 
   bool get isOnLeftExtremeLane => lane == 0;
   bool get isOnRightExtremeLane => lane == game.lanes.length - 1;
@@ -23,7 +26,6 @@ class Player extends SpriteComponent
 
   @override
   Future<void> onLoad() async {
-    // Cargar sprite y configurar tamaño
     sprite = await Sprite.load('cars/white_car.png');
 
     double maxWidth = gameRef.laneWidth * 0.7;
@@ -36,20 +38,19 @@ class Player extends SpriteComponent
   }
 
   void setLanePositions(List<double> lanes) {
-    // Configurar posiciones de carril
     lanePositions = lanes;
-    lane = (lanes.length / 2).floor(); // carril central
+    lane = (lanes.length / 2).floor();
     x = lanePositions[lane];
   }
 
   @override
   void update(double dt) {
-    // Actualizar posición y manejo de hold
     super.update(dt);
 
-    x = lanePositions[lane]; // siempre centrado
+    x = lanePositions[lane];
 
-    if (holdingLeft || holdingRight) {
+    // AGREGAR ESTA VERIFICACIÓN
+    if (canMove && (holdingLeft || holdingRight)) {
       holdTimer += dt;
 
       if (holdTimer >= holdDelay) {
@@ -63,24 +64,25 @@ class Player extends SpriteComponent
 
   @override
   bool onKeyEvent(KeyEvent event, Set<LogicalKeyboardKey> keysPressed) {
-    // KEY DOWN
+    // AGREGAR ESTA VERIFICACIÓN
+    if (!canMove) return true;
+
     if (event is KeyDownEvent) {
       if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
         holdingLeft = true;
         holdingRight = false;
-        moveLeft(); // primer movimiento instantáneo
+        moveLeft();
         holdTimer = 0;
       }
 
       if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
         holdingRight = true;
         holdingLeft = false;
-        moveRight(); // primer movimiento instantáneo
+        moveRight();
         holdTimer = 0;
       }
     }
 
-    // KEY UP
     if (event is KeyUpEvent) {
       if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
         holdingLeft = false;
@@ -97,16 +99,20 @@ class Player extends SpriteComponent
   }
 
   void moveLeft() {
-    if (lane > 0) lane--;
+    // AGREGAR ESTA VERIFICACIÓN
+    if (canMove && lane > 0) lane--;
   }
 
   void moveRight() {
-    if (lane < lanePositions.length - 1) lane++;
+    // AGREGAR ESTA VERIFICACIÓN
+    if (canMove && lane < lanePositions.length - 1) lane++;
   }
 
-  // Manejo de toques en pantalla móvil
   @override
   void onTapDown(TapDownEvent event) {
+    // AGREGAR ESTA VERIFICACIÓN
+    if (!canMove) return;
+
     final touchX = event.localPosition.x;
     final mid = gameRef.size.x / 2;
 

@@ -21,7 +21,7 @@ class FuelManager extends Component with HasGameRef<MyGame> {
     fuel -= drainRate * dt;
 
     // Drenar gasolina adicional en carriles extremos
-    if (game.player.isOnExtremeLane) {
+    if (game.player!.isOnExtremeLane) {
       _extremeLaneTimer += dt;
       if (_extremeLaneTimer >= 1.0) {
         fuel -= extremeLaneFuelDrain;
@@ -59,5 +59,9 @@ class FuelManager extends Component with HasGameRef<MyGame> {
     }
 
     print("SI +$amount fuel → $fuel");
+  }
+
+  void reset() {
+    fuel = maxFuel;
   }
 }
