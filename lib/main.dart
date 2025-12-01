@@ -1,4 +1,6 @@
+import 'package:carreando/config/supabase_config.dart';
 import 'package:carreando/data/vehicle.dart';
+import 'package:carreando/managers/usuario_manager.dart';
 import 'package:carreando/models/vehicle.dart';
 import 'package:carreando/screens/game_over_screen.dart';
 import 'package:carreando/screens/start_screen.dart';
@@ -6,7 +8,9 @@ import 'package:flame/game.dart';
 import 'package:flame/components.dart';
 import 'package:flame/input.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'components/player.dart';
 import 'managers/fuel_manager.dart';
@@ -15,13 +19,25 @@ import 'managers/obstacle_manager.dart';
 
 import 'hud/game_hud.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await SharedPreferences.getInstance();
+
+  await dotenv.load(fileName: "assets/.env");
+
+  await Supabase.initialize(
+    url: SupabaseConfig.supabaseUrl,
+    anonKey: SupabaseConfig.supabaseAnonKey,
+  );
+
   final game = MyGame();
   runApp(GameWidget(game: game, autofocus: true));
 }
 
 class MyGame extends FlameGame
     with HasCollisionDetection, HasKeyboardHandlerComponents {
+  // Configuración de carriles
   late double laneWidth;
   late double sideWidth;
   late List<double> lanes;
@@ -37,6 +53,7 @@ class MyGame extends FlameGame
   ObstacleManager? obstacleManager;
   Player? player;
 
+  // Velocidad de scroll
   double scrollSpeed = 150;
 
   // Fondos verticales
@@ -47,14 +64,16 @@ class MyGame extends FlameGame
   SpriteComponent? topBg1, topBg2;
   SpriteComponent? centerHorizontalBg1, centerHorizontalBg2;
 
+  // Puntaje
   int score = 0;
   double _scoreTimer = 0;
 
+  // Estado del juego
   bool _gameStarted = false;
   bool _gameOver = false;
-
   bool get isGameOver => _gameOver;
 
+  //Modo Horizontal Bool
   bool _isHorizontalMode = false;
   bool get isHorizontalMode => _isHorizontalMode;
 
@@ -67,15 +86,54 @@ class MyGame extends FlameGame
   int selectedVehicleIndex = 0;
   Vehicle get selectedVehicle => availableVehicles[selectedVehicleIndex];
 
+  // Gestión de usuario
+  final UsuarioManager usuarioManager = UsuarioManager();
+
   @override
   Future<void> onLoad() async {
     await super.onLoad();
+    await usuarioManager.cargarUsuarioGuardado();
     await _loadOrientationPreference();
     await _loadVehiclePreference();
-    print('Orientación cargada al iniciar: $_isHorizontalMode');
-    print('Vehículo cargado al iniciar: $selectedVehicleIndex');
     await _showStartScreen();
   }
+
+  //UPDATE DEL JUEGO
+
+  @override
+  void update(double dt) {
+    super.update(dt);
+
+    if (_gameStarted && !_gameOver) {
+      // Scroll según el modo
+      if (_isHorizontalMode) {
+        _scrollHorizontalBackgrounds(dt);
+      } else {
+        _scrollVerticalBackgrounds(dt);
+      }
+
+      // Dificultad
+      timePassed += dt;
+      if (timePassed >= 1.0) {
+        difficultyMultiplier += difficultyIncreaseRate;
+        timePassed = 0.0;
+      }
+
+      // Puntos por tiempo
+      _scoreTimer += dt;
+      if (_scoreTimer >= 1.0) {
+        score += 10;
+        _scoreTimer = 0;
+      }
+
+      if (fuelManager != null && fuelManager!.isEmpty && !_gameOver) {
+        _gameOver = true;
+        _showGameOverScreen();
+      }
+    }
+  }
+
+  //MANEJO DE PANTALLAS
 
   Future<void> _showStartScreen() async {
     _clearAllScreens();
@@ -85,25 +143,20 @@ class MyGame extends FlameGame
     _gameOver = false;
   }
 
-  void startGame() {
-    _clearAllScreens();
-    _initializeGame();
-    _gameStarted = true;
-    _gameOver = false;
-  }
-
-  void restartGame() {
-    _clearAllScreens();
-    _resetGameState();
-    _initializeGame();
-    _gameStarted = true;
-    _gameOver = false;
-  }
-
   void goToStartScreen() {
     _clearAllScreens();
     _resetGameState();
     _showStartScreen();
+  }
+
+  void _showGameOverScreen() {
+    _stopGameLogic();
+    // Guardar puntaje si hay usuario
+    if (usuarioManager.hayUsuario) {
+      usuarioManager.guardarPuntajeActual(score);
+    }
+    gameOverScreen = GameOverScreen();
+    add(gameOverScreen!);
   }
 
   void _clearAllScreens() {
@@ -137,6 +190,23 @@ class MyGame extends FlameGame
     gameHUD = gameOverScreen = startScreen = null;
   }
 
+  //ACCIONES DE ESTADO DEL JUEGO
+
+  void startGame() {
+    _clearAllScreens();
+    _initializeGame();
+    _gameStarted = true;
+    _gameOver = false;
+  }
+
+  void restartGame() {
+    _clearAllScreens();
+    _resetGameState();
+    _initializeGame();
+    _gameStarted = true;
+    _gameOver = false;
+  }
+
   void _resetGameState() {
     score = 0;
     difficultyMultiplier = 1.0;
@@ -152,12 +222,32 @@ class MyGame extends FlameGame
     }
   }
 
+  void _stopGameLogic() {
+    if (pickupManager != null) {
+      pickupManager!.removeFromParent();
+      pickupManager = null;
+    }
+
+    if (obstacleManager != null) {
+      obstacleManager!.removeFromParent();
+      obstacleManager = null;
+    }
+
+    difficultyIncreaseRate = 0;
+    _scoreTimer = 0;
+
+    if (player != null) {
+      player!.canMove = false;
+    }
+  }
+
+  //PERSISTENCIA DE CONFIGURACIONES
+
   Future<void> _loadOrientationPreference() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       _isHorizontalMode = prefs.getBool('orientation_horizontal') ?? false;
     } catch (e) {
-      print('Error loading orientation preference: $e');
       _isHorizontalMode = false;
     }
   }
@@ -176,74 +266,6 @@ class MyGame extends FlameGame
     saveOrientationPreference();
   }
 
-  Future<void> _initializeGame() async {
-    await Future.delayed(Duration.zero);
-
-    if (_isHorizontalMode) {
-      await _initializeHorizontalGame();
-    } else {
-      await _initializeVerticalGame();
-    }
-  }
-
-  Future<void> _initializeVerticalGame() async {
-    final Sprite sideSprite = await Sprite.load(selectedVehicle.sideSpritePath);
-    sideWidth = size.x * 0.18;
-
-    await _createScrollingSideBackground(sideSprite);
-    await _createScrollingCenterBackground();
-
-    _calculateLanes();
-    _initializeManagers();
-  }
-
-  Future<void> _initializeHorizontalGame() async {
-    await _createScrollingHorizontalBackgrounds();
-    _calculateLanes();
-    _initializeManagers();
-  }
-
-  void _calculateLanes() {
-    if (_isHorizontalMode) {
-      // En modo horizontal: calcular carriles basados en la altura
-      sideWidth = size.y * 0.18;
-      double centerHeight = size.y - (sideWidth * 2);
-
-      // Usar un ancho de carril más pequeño para pantallas grandes
-      double minLaneWidth = 70; // Reducido de 90 a 70
-      int numCentralLanes = (centerHeight / minLaneWidth).floor();
-      numCentralLanes = numCentralLanes.clamp(3, 5);
-      laneWidth = centerHeight / numCentralLanes;
-
-      // Lanes verticales en modo horizontal (para movimiento arriba/abajo)
-      lanes = [];
-      lanes.add(sideWidth * 0.35);
-      for (int i = 0; i < numCentralLanes; i++) {
-        double cy = sideWidth + (laneWidth * i) + (laneWidth / 2);
-        lanes.add(cy);
-      }
-      lanes.add(size.y - (sideWidth * 0.35));
-    } else {
-      // En modo vertical: calcular carriles basados en el ancho
-      sideWidth = size.x * 0.18;
-      double centerWidth = size.x - (sideWidth * 2);
-
-      // Usar un ancho de carril más pequeño para pantallas grandes
-      double minLaneWidth = 70; // Reducido de 90 a 70
-      int numCentralLanes = (centerWidth / minLaneWidth).floor();
-      numCentralLanes = numCentralLanes.clamp(3, 5);
-      laneWidth = centerWidth / numCentralLanes;
-
-      lanes = [];
-      lanes.add(sideWidth * 0.35);
-      for (int i = 0; i < numCentralLanes; i++) {
-        double cx = sideWidth + (laneWidth * i) + (laneWidth / 2);
-        lanes.add(cx);
-      }
-      lanes.add(size.x - (sideWidth * 0.35));
-    }
-  }
-
   Future<void> _loadVehiclePreference() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -257,7 +279,6 @@ class MyGame extends FlameGame
         selectedVehicleIndex = 0; // Valor por defecto
       }
     } catch (e) {
-      print('Error loading vehicle preference: $e');
       selectedVehicleIndex = 0;
     }
   }
@@ -271,21 +292,7 @@ class MyGame extends FlameGame
     }
   }
 
-  // Modifica los métodos existentes para que guarden automáticamente:
-  void selectNextVehicle() {
-    selectedVehicleIndex =
-        (selectedVehicleIndex + 1) % availableVehicles.length;
-    saveVehiclePreference(); // ← Agregar esta línea
-  }
-
-  void selectPreviousVehicle() {
-    selectedVehicleIndex =
-        (selectedVehicleIndex - 1) % availableVehicles.length;
-    if (selectedVehicleIndex < 0) {
-      selectedVehicleIndex = availableVehicles.length - 1;
-    }
-    saveVehiclePreference(); // ← Agregar esta línea
-  }
+  //INICIALIZACIÓN DE MANAGERS
 
   void _initializeManagers() {
     fuelManager = FuelManager();
@@ -341,6 +348,98 @@ class MyGame extends FlameGame
     gameHUD!.size = size;
   }
 
+  //INICIALIZACIÓN DEL JUEGO
+
+  Future<void> _initializeGame() async {
+    await Future.delayed(Duration.zero);
+
+    if (_isHorizontalMode) {
+      await _initializeHorizontalGame();
+    } else {
+      await _initializeVerticalGame();
+    }
+  }
+
+  //INICIALIZACIÓN VERTICAL Y HORIZONTAL
+
+  Future<void> _initializeVerticalGame() async {
+    final Sprite sideSprite = await Sprite.load(selectedVehicle.sideSpritePath);
+    sideWidth = size.x * 0.18;
+
+    await _createScrollingSideBackground(sideSprite);
+    await _createScrollingCenterBackground();
+
+    _calculateLanes();
+    _initializeManagers();
+  }
+
+  Future<void> _initializeHorizontalGame() async {
+    await _createScrollingHorizontalBackgrounds();
+    _calculateLanes();
+    _initializeManagers();
+  }
+
+  //CÁLCULO DE CARRILES
+
+  void _calculateLanes() {
+    if (_isHorizontalMode) {
+      // En modo horizontal: calcular carriles basados en la altura
+      sideWidth = size.y * 0.18;
+      double centerHeight = size.y - (sideWidth * 2);
+
+      // Usar un ancho de carril más pequeño para pantallas grandes
+      double minLaneWidth = 70;
+      int numCentralLanes = (centerHeight / minLaneWidth).floor();
+      numCentralLanes = numCentralLanes.clamp(3, 5);
+      laneWidth = centerHeight / numCentralLanes;
+
+      // Lanes verticales en modo horizontal (para movimiento arriba/abajo)
+      lanes = [];
+      lanes.add(sideWidth * 0.35);
+      for (int i = 0; i < numCentralLanes; i++) {
+        double cy = sideWidth + (laneWidth * i) + (laneWidth / 2);
+        lanes.add(cy);
+      }
+      lanes.add(size.y - (sideWidth * 0.35));
+    } else {
+      // En modo vertical: calcular carriles basados en el ancho
+      sideWidth = size.x * 0.18;
+      double centerWidth = size.x - (sideWidth * 2);
+
+      // Usar un ancho de carril más pequeño para pantallas grandes
+      double minLaneWidth = 70;
+      int numCentralLanes = (centerWidth / minLaneWidth).floor();
+      numCentralLanes = numCentralLanes.clamp(3, 5);
+      laneWidth = centerWidth / numCentralLanes;
+
+      lanes = [];
+      lanes.add(sideWidth * 0.35);
+      for (int i = 0; i < numCentralLanes; i++) {
+        double cx = sideWidth + (laneWidth * i) + (laneWidth / 2);
+        lanes.add(cx);
+      }
+      lanes.add(size.x - (sideWidth * 0.35));
+    }
+  }
+
+  // SELECCIÓN DE VEHÍCULO
+  void selectNextVehicle() {
+    selectedVehicleIndex =
+        (selectedVehicleIndex + 1) % availableVehicles.length;
+    saveVehiclePreference();
+  }
+
+  void selectPreviousVehicle() {
+    selectedVehicleIndex =
+        (selectedVehicleIndex - 1) % availableVehicles.length;
+    if (selectedVehicleIndex < 0) {
+      selectedVehicleIndex = availableVehicles.length - 1;
+    }
+    saveVehiclePreference();
+  }
+
+  // FUNCIONES DE FONDO Y SCROLLING
+
   Future<void> _createScrollingHorizontalBackgrounds() async {
     final Sprite sideSprite = await Sprite.load(
       selectedVehicle.sideHorizontalSpritePath,
@@ -391,40 +490,6 @@ class MyGame extends FlameGame
     add(centerHorizontalBg2!);
   }
 
-  @override
-  void update(double dt) {
-    super.update(dt);
-
-    if (_gameStarted && !_gameOver) {
-      // Scroll según el modo
-      if (_isHorizontalMode) {
-        _scrollHorizontalBackgrounds(dt);
-      } else {
-        _scrollVerticalBackgrounds(dt);
-      }
-
-      // Dificultad
-      timePassed += dt;
-      if (timePassed >= 1.0) {
-        difficultyMultiplier += difficultyIncreaseRate;
-        timePassed = 0.0;
-      }
-
-      // Puntos por tiempo
-      _scoreTimer += dt;
-      if (_scoreTimer >= 1.0) {
-        score += 10;
-        _scoreTimer = 0;
-      }
-
-      if (fuelManager != null && fuelManager!.isEmpty && !_gameOver) {
-        _gameOver = true;
-        _showGameOverScreen();
-      }
-    }
-  }
-
-  // MODIFICADO: Solo topBg y centerHorizontalBg
   void _scrollHorizontalBackgrounds(double dt) {
     // Scroll para fondos horizontales
     if (topBg1 != null) _scrollHorizontal(topBg1!, dt);
@@ -450,7 +515,6 @@ class MyGame extends FlameGame
     }
   }
 
-  // MODIFICADO: Solo leftBg y centerBg
   void _scrollVerticalBackgrounds(double dt) {
     if (leftBg1 != null) _scrollVertical(leftBg1!, dt);
     if (leftBg2 != null) _scrollVertical(leftBg2!, dt);
@@ -467,31 +531,6 @@ class MyGame extends FlameGame
 
     if (bg.y <= -2 * size.y) {
       bg.y += 2 * size.y;
-    }
-  }
-
-  void _showGameOverScreen() {
-    _stopGameLogic();
-    gameOverScreen = GameOverScreen();
-    add(gameOverScreen!);
-  }
-
-  void _stopGameLogic() {
-    if (pickupManager != null) {
-      pickupManager!.removeFromParent();
-      pickupManager = null;
-    }
-
-    if (obstacleManager != null) {
-      obstacleManager!.removeFromParent();
-      obstacleManager = null;
-    }
-
-    difficultyIncreaseRate = 0;
-    _scoreTimer = 0;
-
-    if (player != null) {
-      player!.canMove = false;
     }
   }
 
@@ -513,7 +552,6 @@ class MyGame extends FlameGame
     add(leftBg2!);
   }
 
-  // MODIFICADO: Calle superpuesta en modo vertical
   Future<void> _createScrollingCenterBackground() async {
     final Sprite centerSprite = await Sprite.load(
       selectedVehicle.roadSpritePath,
@@ -536,6 +574,7 @@ class MyGame extends FlameGame
     add(centerBg2!);
   }
 
+  //ONGAME RESIZE
   @override
   void onGameResize(Vector2 size) {
     super.onGameResize(size);
@@ -589,7 +628,6 @@ class MyGame extends FlameGame
     }
     lanes.add(size.x - (sideWidth * 0.35));
 
-    // MODIFICADO: Solo leftBg y centerBg
     if (leftBg1 != null) _resizeSideBackgrounds(oldSize);
     if (centerBg1 != null) _resizeCenterBackground(oldSize);
 
@@ -599,10 +637,7 @@ class MyGame extends FlameGame
       double currentWidth = player!.width;
       double scale = targetWidth / currentWidth;
       player!.scale = Vector2.all(scale);
-      player!.position = Vector2(
-        lanes[player!.lane],
-        size.y * 0.85, // ← CAMBIADO a porcentaje como en horizontal
-      );
+      player!.position = Vector2(lanes[player!.lane], size.y * 0.85);
     }
 
     if (pickupManager != null) pickupManager!.updateLanes(lanes);
@@ -615,7 +650,7 @@ class MyGame extends FlameGame
     sideWidth = size.y * 0.18;
     double centerHeight = size.y - (sideWidth * 2);
 
-    double minLaneWidth = 70; // Reducido para pantallas grandes
+    double minLaneWidth = 70;
     int numCentralLanes = (centerHeight / minLaneWidth).floor();
     numCentralLanes = numCentralLanes.clamp(3, 5);
     laneWidth = centerHeight / numCentralLanes;
@@ -628,7 +663,6 @@ class MyGame extends FlameGame
     }
     lanes.add(size.y - (sideWidth * 0.35));
 
-    // MODIFICADO: Solo topBg y centerHorizontalBg
     final fullBgSize = Vector2(size.x, size.y);
     final centerSize = Vector2(size.x, centerHeight);
 
@@ -693,12 +727,10 @@ class MyGame extends FlameGame
 
     // Asegurar la posición relativa correcta
     if (bg1.x < bg2.x) {
-      // bg1 está a la izquierda de bg2
       if (bg2.x - bg1.x != size.x) {
         bg2.x = bg1.x + size.x;
       }
     } else {
-      // bg2 está a la izquierda de bg1
       if (bg1.x - bg2.x != size.x) {
         bg1.x = bg2.x + size.x;
       }
@@ -711,7 +743,6 @@ class MyGame extends FlameGame
     if (bg2.x >= size.x * 2) bg2.x = -size.x;
   }
 
-  // MODIFICADO: Solo leftBg (fondo completo)
   void _resizeSideBackgrounds(Vector2 oldSize) {
     final bgSize = Vector2(size.x, size.y);
 

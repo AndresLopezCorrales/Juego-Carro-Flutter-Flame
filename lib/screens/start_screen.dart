@@ -1,4 +1,5 @@
 import 'package:carreando/data/vehicle.dart';
+import 'package:carreando/screens/leaderboard_screen.dart';
 import 'package:carreando/screens/options_screen.dart';
 import 'package:flame/components.dart';
 import 'package:flame/events.dart';
@@ -38,6 +39,7 @@ class StartScreen extends PositionComponent
   void _calculateAreas() {
     final double screenHeight = size.y;
     final double screenWidth = size.x;
+    final bool isHorizontal = screenWidth > screenHeight;
 
     // Título: 12% de la pantalla
     _titleArea = Rect.fromLTWH(
@@ -55,12 +57,13 @@ class StartScreen extends PositionComponent
       screenHeight * 0.35,
     );
 
-    // Calcular altura para cada botón (35% de pantalla dividido entre 4 botones con menos separación)
+    // Calcular altura para cada botón - más separación en horizontal
     final double totalButtonsHeight = screenHeight * 0.35;
-    final double buttonHeight =
-        totalButtonsHeight * 0.18; // Botones más pequeños
-    final double buttonSpacing =
-        totalButtonsHeight * 0.04; // Menos espacio entre botones
+    final double buttonHeight = totalButtonsHeight * 0.18;
+    final double buttonSpacing = isHorizontal
+        ? totalButtonsHeight *
+              0.06 // Más separación en horizontal
+        : totalButtonsHeight * 0.04;
     final double buttonsStartY =
         _vehicleSelectorArea.bottom + (screenHeight * 0.02);
 
@@ -107,6 +110,7 @@ class StartScreen extends PositionComponent
 
   void _setupTextPaints() {
     final double baseSize = _calculateBaseFontSize();
+    final bool isHorizontal = size.x > size.y;
 
     titlePaint = TextPaint(
       style: TextStyle(
@@ -140,17 +144,17 @@ class StartScreen extends PositionComponent
       ),
     );
 
+    // Texto de botones más pequeño en horizontal
     buttonPaint = TextPaint(
       style: TextStyle(
         color: BasicPalette.white.color,
-        fontSize:
-            baseSize * 1.2, // Texto un poco más grande para mejor legibilidad
+        fontSize: isHorizontal ? baseSize * 0.85 : baseSize * 1.2,
         fontFamily: 'Arial',
         fontWeight: FontWeight.w600,
         shadows: [
           Shadow(
             color: BasicPalette.black.color,
-            blurRadius: 6.0, // Sombra más pronunciada para contraste
+            blurRadius: 6.0,
             offset: Offset(2.0, 2.0),
           ),
         ],
@@ -372,7 +376,7 @@ class StartScreen extends PositionComponent
     final buttonTextSize = _measureText(text, buttonPaint);
 
     // Botón ocupa 50% del ancho del área (más estrecho) y 100% del alto del área
-    final double buttonWidth = area.width * 0.50;
+    final double buttonWidth = area.width * 0.45;
     final double buttonHeight = area.height;
 
     final buttonX = area.center.dx - (buttonWidth / 2);
@@ -419,7 +423,6 @@ class StartScreen extends PositionComponent
     final double verticalPadding =
         buttonHeight * 0.2; // 20% de padding vertical
 
-    final buttonTextX = buttonX + horizontalPadding;
     final buttonTextY = buttonY + verticalPadding;
     final double availableTextWidth = buttonWidth - (horizontalPadding * 2);
 
@@ -430,6 +433,7 @@ class StartScreen extends PositionComponent
       buttonPaint.render(canvas, text, Vector2(centeredTextX, buttonTextY));
     } else {
       // Renderizar normalmente con padding
+      final buttonTextX = buttonX + horizontalPadding;
       buttonPaint.render(canvas, text, Vector2(buttonTextX, buttonTextY));
     }
   }
@@ -455,14 +459,10 @@ class StartScreen extends PositionComponent
     if (_playButtonArea.contains(tapPosition.toOffset())) {
       gameRef.startGame();
     } else if (_leaderboardButtonArea.contains(tapPosition.toOffset())) {
-      // TODO: Implementar Leaderboard
-      print('Leaderboard - Por implementar');
+      _goToLeaderboardScreen();
     } else if (_optionsButtonArea.contains(tapPosition.toOffset())) {
-      // TODO: Implementar pantalla de opciones
-      print('Opciones - Por implementar');
       _goToOptionsScreen();
     } else if (_creditsButtonArea.contains(tapPosition.toOffset())) {
-      // TODO: Implementar pantalla de créditos
       print('Créditos - Por implementar');
     } else if (_vehicleSelectorArea.contains(tapPosition.toOffset())) {
       _handleVehicleSelectorTap(tapPosition);
@@ -472,6 +472,11 @@ class StartScreen extends PositionComponent
   void _goToOptionsScreen() {
     final optionsScreen = OptionsScreen();
     gameRef.add(optionsScreen);
+  }
+
+  void _goToLeaderboardScreen() {
+    final leaderboardScreen = LeaderboardScreen();
+    gameRef.add(leaderboardScreen);
   }
 
   void _handleVehicleSelectorTap(Vector2 tapPosition) {
@@ -524,7 +529,7 @@ class StartScreen extends PositionComponent
     super.onGameResize(size);
     this.size = size;
     position = Vector2.zero();
-    _calculateAreas(); // Recalcular áreas al cambiar tamaño
+    _calculateAreas();
     _setupTextPaints();
   }
 }
