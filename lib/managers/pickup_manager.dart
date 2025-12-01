@@ -65,6 +65,8 @@ class PickupManager extends Component with HasGameRef<MyGame> {
         position: Vector2(gameRef.size.x + 50, spawnY),
         fuelManager: fuelManager,
         isHorizontalMode: true,
+        gasSpritePath:
+            gameRef.selectedVehicle.gasSpritePath, // Usar sprite del vehículo
       );
       gameRef.add(pickup);
     } else {
@@ -78,6 +80,8 @@ class PickupManager extends Component with HasGameRef<MyGame> {
         position: Vector2(laneX, -50),
         fuelManager: fuelManager,
         isHorizontalMode: false,
+        gasSpritePath:
+            gameRef.selectedVehicle.gasSpritePath, // Usar sprite del vehículo
       );
       gameRef.add(pickup);
     }
@@ -103,6 +107,8 @@ class PickupManager extends Component with HasGameRef<MyGame> {
       final coin = GoldCoin(
         position: Vector2(gameRef.size.x + 50, spawnY),
         isHorizontalMode: true,
+        moneySpritePath:
+            gameRef.selectedVehicle.moneySpritePath, // Usar sprite del vehículo
       );
       gameRef.add(coin);
     } else {
@@ -115,6 +121,8 @@ class PickupManager extends Component with HasGameRef<MyGame> {
       final coin = GoldCoin(
         position: Vector2(laneX, -50),
         isHorizontalMode: false,
+        moneySpritePath:
+            gameRef.selectedVehicle.moneySpritePath, // Usar sprite del vehículo
       );
       gameRef.add(coin);
     }

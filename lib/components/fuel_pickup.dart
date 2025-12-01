@@ -13,15 +13,22 @@ class FuelPickup extends SpriteComponent
   final FuelManager fuelManager;
   final bool isHorizontalMode;
 
+  // Agregar parámetro para el path del sprite
+  final String gasSpritePath;
+
   FuelPickup({
     required Vector2 position,
     required this.fuelManager,
     this.isHorizontalMode = false,
+    required this.gasSpritePath,
   }) : super(position: position, anchor: Anchor.center);
 
   @override
   Future<void> onLoad() async {
-    sprite = await gameRef.loadSprite('power_ups/bidon.png');
+    // Usar el sprite del vehículo seleccionado
+    sprite = await gameRef.loadSprite(gasSpritePath);
+
+    priority = 50;
 
     double maxWidth = gameRef.laneWidth * 0.45;
     double ratio = sprite!.srcSize.y / sprite!.srcSize.x;

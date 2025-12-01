@@ -12,6 +12,9 @@ class Obstacle extends SpriteComponent
   final Player player;
   final bool isHorizontalMode;
 
+  // Agregar parámetro para el path del sprite
+  final String obstacleSpritePath;
+
   bool hit = false;
 
   Obstacle({
@@ -19,11 +22,15 @@ class Obstacle extends SpriteComponent
     required this.player,
     required Vector2 startPosition,
     this.isHorizontalMode = false,
+    required this.obstacleSpritePath,
   }) : super(anchor: Anchor.center, position: startPosition);
 
   @override
   Future<void> onLoad() async {
-    sprite = await Sprite.load('obstaculos/cono.png');
+    // Usar el sprite del vehículo seleccionado
+    sprite = await Sprite.load(obstacleSpritePath);
+
+    priority = 50;
 
     double maxWidth = gameRef.laneWidth * 0.55;
     double ratio = sprite!.srcSize.y / sprite!.srcSize.x;

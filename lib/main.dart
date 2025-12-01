@@ -1,9 +1,12 @@
+import 'package:carreando/data/vehicle.dart';
+import 'package:carreando/models/vehicle.dart';
 import 'package:carreando/screens/game_over_screen.dart';
 import 'package:carreando/screens/start_screen.dart';
 import 'package:flame/game.dart';
 import 'package:flame/components.dart';
 import 'package:flame/input.dart';
 import 'package:flutter/widgets.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'components/player.dart';
 import 'managers/fuel_manager.dart';
@@ -38,13 +41,11 @@ class MyGame extends FlameGame
 
   // Fondos verticales
   SpriteComponent? leftBg1, leftBg2;
-  SpriteComponent? rightBg1, rightBg2;
   SpriteComponent? centerBg1, centerBg2;
 
-  // Fondos horizontales - CON SCROLL
+  // Fondos horizontales
   SpriteComponent? topBg1, topBg2;
   SpriteComponent? centerHorizontalBg1, centerHorizontalBg2;
-  SpriteComponent? bottomBg1, bottomBg2;
 
   int score = 0;
   double _scoreTimer = 0;
@@ -62,9 +63,17 @@ class MyGame extends FlameGame
   GameOverScreen? gameOverScreen;
   GameHUD? gameHUD;
 
+  // Vehículos disponibles y seleccionado
+  int selectedVehicleIndex = 0;
+  Vehicle get selectedVehicle => availableVehicles[selectedVehicleIndex];
+
   @override
   Future<void> onLoad() async {
     await super.onLoad();
+    await _loadOrientationPreference();
+    await _loadVehiclePreference();
+    print('Orientación cargada al iniciar: $_isHorizontalMode');
+    print('Vehículo cargado al iniciar: $selectedVehicleIndex');
     await _showStartScreen();
   }
 
@@ -118,10 +127,11 @@ class MyGame extends FlameGame
       }
     });
 
-    // Limpiar referencias
-    leftBg1 = leftBg2 = rightBg1 = rightBg2 = centerBg1 = centerBg2 = null;
-    topBg1 = topBg2 = centerHorizontalBg1 = centerHorizontalBg2 = bottomBg1 =
-        bottomBg2 = null;
+    // Limpiar referencias - MODIFICADO: solo leftBg y topBg como fondos completos
+    leftBg1 = leftBg2 = null;
+    centerBg1 = centerBg2 = null;
+    topBg1 = topBg2 = null;
+    centerHorizontalBg1 = centerHorizontalBg2 = null;
 
     fuelManager = pickupManager = obstacleManager = player = null;
     gameHUD = gameOverScreen = startScreen = null;
@@ -142,8 +152,28 @@ class MyGame extends FlameGame
     }
   }
 
+  Future<void> _loadOrientationPreference() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _isHorizontalMode = prefs.getBool('orientation_horizontal') ?? false;
+    } catch (e) {
+      print('Error loading orientation preference: $e');
+      _isHorizontalMode = false;
+    }
+  }
+
+  Future<void> saveOrientationPreference() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('orientation_horizontal', _isHorizontalMode);
+    } catch (e) {
+      print('Error saving orientation preference: $e');
+    }
+  }
+
   void setHorizontalMode(bool horizontal) {
     _isHorizontalMode = horizontal;
+    saveOrientationPreference();
   }
 
   Future<void> _initializeGame() async {
@@ -157,7 +187,7 @@ class MyGame extends FlameGame
   }
 
   Future<void> _initializeVerticalGame() async {
-    final Sprite sideSprite = await Sprite.load("escenarios/side.png");
+    final Sprite sideSprite = await Sprite.load(selectedVehicle.sideSpritePath);
     sideWidth = size.x * 0.18;
 
     await _createScrollingSideBackground(sideSprite);
@@ -214,47 +244,74 @@ class MyGame extends FlameGame
     }
   }
 
+  Future<void> _loadVehiclePreference() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      int? savedVehicleIndex = prefs.getInt('selected_vehicle_index');
+
+      if (savedVehicleIndex != null &&
+          savedVehicleIndex >= 0 &&
+          savedVehicleIndex < availableVehicles.length) {
+        selectedVehicleIndex = savedVehicleIndex;
+      } else {
+        selectedVehicleIndex = 0; // Valor por defecto
+      }
+    } catch (e) {
+      print('Error loading vehicle preference: $e');
+      selectedVehicleIndex = 0;
+    }
+  }
+
+  Future<void> saveVehiclePreference() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt('selected_vehicle_index', selectedVehicleIndex);
+    } catch (e) {
+      print('Error saving vehicle preference: $e');
+    }
+  }
+
+  // Modifica los métodos existentes para que guarden automáticamente:
+  void selectNextVehicle() {
+    selectedVehicleIndex =
+        (selectedVehicleIndex + 1) % availableVehicles.length;
+    saveVehiclePreference(); // ← Agregar esta línea
+  }
+
+  void selectPreviousVehicle() {
+    selectedVehicleIndex =
+        (selectedVehicleIndex - 1) % availableVehicles.length;
+    if (selectedVehicleIndex < 0) {
+      selectedVehicleIndex = availableVehicles.length - 1;
+    }
+    saveVehiclePreference(); // ← Agregar esta línea
+  }
+
   void _initializeManagers() {
     fuelManager = FuelManager();
     add(fuelManager!);
 
-    player = Player();
+    player = Player(vehicle: selectedVehicle);
 
-    // AÑADIR ESTA LÍNEA PRIMERO - agregar el jugador antes de configurar posición
+    // PRIORIDAD MÁS ALTA para el jugador (encima de todo)
+    player!.priority = 100;
     add(player!);
 
     player!.setLanePositions(lanes);
 
     if (_isHorizontalMode) {
-      // En horizontal: jugador a la izquierda (15% del ancho), se mueve verticalmente
       player!.position = Vector2(size.x * 0.15, lanes[player!.lane]);
     } else {
-      // En vertical: jugador más arriba (85% de la altura), se mueve horizontalmente
-      player!.position = Vector2(
-        lanes[player!.lane],
-        size.y * 0.85, // ← CAMBIADO a porcentaje como en horizontal
-      );
+      player!.position = Vector2(lanes[player!.lane], size.y * 0.85);
     }
 
-    // Escalar el jugador adecuadamente - VERIFICAR QUE EL JUGADOR TENGA SPRITE
+    // Escalar el jugador
     double targetWidth = laneWidth * 0.7;
-    double currentWidth = player!.width;
-
-    // AÑADIR VERIFICACIÓN PARA EVITAR DIVISIÓN POR CERO
-    if (currentWidth > 0) {
-      double scale = targetWidth / currentWidth;
-      player!.scale = Vector2.all(scale);
+    if (player!.width > 0) {
+      player!.scale = Vector2.all(targetWidth / player!.width);
     } else {
-      // Si no tiene ancho, asignar uno por defecto
       player!.size = Vector2(targetWidth, targetWidth * 1.5);
     }
-
-    // AGREGAR DEBUG PARA VERIFICAR POSICIÓN
-    print('Player position: ${player!.position}');
-    print('Player size: ${player!.size}');
-    print('Player scale: ${player!.scale}');
-    print('Lanes: $lanes');
-    print('Current lane: ${player!.lane}');
 
     pickupManager = PickupManager(
       lanes: lanes,
@@ -262,6 +319,8 @@ class MyGame extends FlameGame
       player: player!,
       isHorizontalMode: _isHorizontalMode,
     );
+    // PRIORIDAD ALTA para pickups (encima de la calle)
+    pickupManager!.priority = 50;
     add(pickupManager!);
 
     obstacleManager = ObstacleManager(
@@ -270,35 +329,46 @@ class MyGame extends FlameGame
       player: player!,
       isHorizontalMode: _isHorizontalMode,
     );
+    // PRIORIDAD ALTA para obstáculos (encima de la calle)
+    obstacleManager!.priority = 50;
     add(obstacleManager!);
 
     gameHUD = GameHUD();
+    // HUD con la prioridad MÁS ALTA (encima de todo)
+    gameHUD!.priority = 200;
     add(gameHUD!);
     gameHUD!.position = Vector2.zero();
     gameHUD!.size = size;
   }
 
   Future<void> _createScrollingHorizontalBackgrounds() async {
-    final Sprite sideSprite = await Sprite.load("escenarios/side_h.png");
-    final Sprite centerSprite = await Sprite.load("carreteras/calle_h.png");
+    final Sprite sideSprite = await Sprite.load(
+      selectedVehicle.sideHorizontalSpritePath,
+    );
+    final Sprite centerSprite = await Sprite.load(
+      selectedVehicle.roadHorizontalSpritePath,
+    );
 
-    // En modo horizontal: fondos con scroll horizontal
     sideWidth = size.y * 0.18;
     double centerHeight = size.y - (sideWidth * 2);
 
-    // Fondos superiores (scroll horizontal)
-    final topBottomSize = Vector2(size.x, sideWidth);
+    // FONDOS COMPLETOS (side)
+    final fullBgSize = Vector2(size.x, size.y);
 
-    topBg1 = SpriteComponent(sprite: sideSprite, size: topBottomSize);
-    topBg2 = SpriteComponent(sprite: sideSprite, size: topBottomSize);
+    topBg1 = SpriteComponent(sprite: sideSprite, size: fullBgSize);
+    topBg2 = SpriteComponent(sprite: sideSprite, size: fullBgSize);
 
     topBg1!.position = Vector2(0, 0);
-    topBg2!.position = Vector2(size.x, 0); // Colocado a la derecha
+    topBg2!.position = Vector2(size.x, 0);
+
+    // PRIORIDAD MÁS BAJA para el fondo side
+    topBg1!.priority = 0;
+    topBg2!.priority = 0;
 
     add(topBg1!);
     add(topBg2!);
 
-    // Carretera central (scroll horizontal)
+    // CARRETERA CENTRAL
     final centerSize = Vector2(size.x, centerHeight);
 
     centerHorizontalBg1 = SpriteComponent(
@@ -311,26 +381,14 @@ class MyGame extends FlameGame
     );
 
     centerHorizontalBg1!.position = Vector2(0, sideWidth);
-    centerHorizontalBg2!.position = Vector2(
-      size.x,
-      sideWidth,
-    ); // Colocado a la derecha
+    centerHorizontalBg2!.position = Vector2(size.x, sideWidth);
+
+    // PRIORIDAD BAJA para la calle (debajo de jugador y objetos)
+    centerHorizontalBg1!.priority = 10;
+    centerHorizontalBg2!.priority = 10;
 
     add(centerHorizontalBg1!);
     add(centerHorizontalBg2!);
-
-    // Fondos inferiores (scroll horizontal)
-    bottomBg1 = SpriteComponent(sprite: sideSprite, size: topBottomSize);
-    bottomBg2 = SpriteComponent(sprite: sideSprite, size: topBottomSize);
-
-    bottomBg1!.position = Vector2(0, size.y - sideWidth);
-    bottomBg2!.position = Vector2(
-      size.x,
-      size.y - sideWidth,
-    ); // Colocado a la derecha
-
-    add(bottomBg1!);
-    add(bottomBg2!);
   }
 
   @override
@@ -366,6 +424,7 @@ class MyGame extends FlameGame
     }
   }
 
+  // MODIFICADO: Solo topBg y centerHorizontalBg
   void _scrollHorizontalBackgrounds(double dt) {
     // Scroll para fondos horizontales
     if (topBg1 != null) _scrollHorizontal(topBg1!, dt);
@@ -374,8 +433,6 @@ class MyGame extends FlameGame
       _scrollHorizontal(centerHorizontalBg1!, dt);
     if (centerHorizontalBg2 != null)
       _scrollHorizontal(centerHorizontalBg2!, dt);
-    if (bottomBg1 != null) _scrollHorizontal(bottomBg1!, dt);
-    if (bottomBg2 != null) _scrollHorizontal(bottomBg2!, dt);
   }
 
   void _scrollHorizontal(SpriteComponent bg, double dt) {
@@ -393,11 +450,10 @@ class MyGame extends FlameGame
     }
   }
 
+  // MODIFICADO: Solo leftBg y centerBg
   void _scrollVerticalBackgrounds(double dt) {
     if (leftBg1 != null) _scrollVertical(leftBg1!, dt);
     if (leftBg2 != null) _scrollVertical(leftBg2!, dt);
-    if (rightBg1 != null) _scrollVertical(rightBg1!, dt);
-    if (rightBg2 != null) _scrollVertical(rightBg2!, dt);
     if (centerBg1 != null) _scrollVertical(centerBg1!, dt);
     if (centerBg2 != null) _scrollVertical(centerBg2!, dt);
   }
@@ -440,26 +496,28 @@ class MyGame extends FlameGame
   }
 
   Future<void> _createScrollingSideBackground(Sprite sprite) async {
-    final bgSize = Vector2(sideWidth, size.y);
+    // El side ahora ocupa toda la pantalla de fondo
+    final bgSize = Vector2(size.x, size.y);
 
     leftBg1 = SpriteComponent(sprite: sprite, size: bgSize);
     leftBg2 = SpriteComponent(sprite: sprite, size: bgSize);
-    rightBg1 = SpriteComponent(sprite: sprite, size: bgSize);
-    rightBg2 = SpriteComponent(sprite: sprite, size: bgSize);
 
     leftBg1!.position = Vector2(0, 0);
     leftBg2!.position = Vector2(0, -size.y);
-    rightBg1!.position = Vector2(size.x - sideWidth, 0);
-    rightBg2!.position = Vector2(size.x - sideWidth, -size.y);
+
+    // PRIORIDAD MÁS BAJA para el fondo side
+    leftBg1!.priority = 0;
+    leftBg2!.priority = 0;
 
     add(leftBg1!);
     add(leftBg2!);
-    add(rightBg1!);
-    add(rightBg2!);
   }
 
+  // MODIFICADO: Calle superpuesta en modo vertical
   Future<void> _createScrollingCenterBackground() async {
-    final Sprite centerSprite = await Sprite.load("carreteras/calle.png");
+    final Sprite centerSprite = await Sprite.load(
+      selectedVehicle.roadSpritePath,
+    );
 
     double centerWidth = size.x - (sideWidth * 2);
     final bgSize = Vector2(centerWidth, size.y);
@@ -469,6 +527,10 @@ class MyGame extends FlameGame
 
     centerBg1!.position = Vector2(sideWidth, 0);
     centerBg2!.position = Vector2(sideWidth, -size.y);
+
+    // PRIORIDAD BAJA para la calle (debajo de jugador y objetos)
+    centerBg1!.priority = 10;
+    centerBg2!.priority = 10;
 
     add(centerBg1!);
     add(centerBg2!);
@@ -527,6 +589,7 @@ class MyGame extends FlameGame
     }
     lanes.add(size.x - (sideWidth * 0.35));
 
+    // MODIFICADO: Solo leftBg y centerBg
     if (leftBg1 != null) _resizeSideBackgrounds(oldSize);
     if (centerBg1 != null) _resizeCenterBackground(oldSize);
 
@@ -565,21 +628,22 @@ class MyGame extends FlameGame
     }
     lanes.add(size.y - (sideWidth * 0.35));
 
-    // Actualizar tamaños de fondos horizontales
-    final topBottomSize = Vector2(size.x, sideWidth);
+    // MODIFICADO: Solo topBg y centerHorizontalBg
+    final fullBgSize = Vector2(size.x, size.y);
     final centerSize = Vector2(size.x, centerHeight);
 
-    // Actualizar fondos horizontales manteniendo el progreso del scroll
+    // Actualizar fondos completos
     if (topBg1 != null && topBg2 != null) {
       _resizeHorizontalBackgroundPair(
         topBg1!,
         topBg2!,
         oldSize,
-        topBottomSize,
-        0,
+        fullBgSize,
+        0, // Y position 0 porque ahora ocupa toda la pantalla
       );
     }
 
+    // Actualizar carretera central
     if (centerHorizontalBg1 != null && centerHorizontalBg2 != null) {
       _resizeHorizontalBackgroundPair(
         centerHorizontalBg1!,
@@ -587,16 +651,6 @@ class MyGame extends FlameGame
         oldSize,
         centerSize,
         sideWidth,
-      );
-    }
-
-    if (bottomBg1 != null && bottomBg2 != null) {
-      _resizeHorizontalBackgroundPair(
-        bottomBg1!,
-        bottomBg2!,
-        oldSize,
-        topBottomSize,
-        size.y - sideWidth,
       );
     }
 
@@ -657,21 +711,17 @@ class MyGame extends FlameGame
     if (bg2.x >= size.x * 2) bg2.x = -size.x;
   }
 
+  // MODIFICADO: Solo leftBg (fondo completo)
   void _resizeSideBackgrounds(Vector2 oldSize) {
-    final bgSize = Vector2(sideWidth, size.y);
+    final bgSize = Vector2(size.x, size.y);
 
     leftBg1!.size = bgSize;
     leftBg2!.size = bgSize;
-    rightBg1!.size = bgSize;
-    rightBg2!.size = bgSize;
 
     _repositionScrollingBackground(leftBg1!, leftBg2!, oldSize);
-    _repositionScrollingBackground(rightBg1!, rightBg2!, oldSize);
 
     leftBg1!.position.x = 0;
     leftBg2!.position.x = 0;
-    rightBg1!.position.x = size.x - sideWidth;
-    rightBg2!.position.x = size.x - sideWidth;
   }
 
   void _resizeCenterBackground(Vector2 oldSize) {

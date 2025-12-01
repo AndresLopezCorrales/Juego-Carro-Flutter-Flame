@@ -10,12 +10,21 @@ class GoldCoin extends SpriteComponent
   static const double fallSpeed = 230;
   final bool isHorizontalMode;
 
-  GoldCoin({required Vector2 position, this.isHorizontalMode = false})
-    : super(position: position, anchor: Anchor.center);
+  // Agregar parámetro para el path del sprite
+  final String moneySpritePath;
+
+  GoldCoin({
+    required Vector2 position,
+    this.isHorizontalMode = false,
+    required this.moneySpritePath,
+  }) : super(position: position, anchor: Anchor.center);
 
   @override
   Future<void> onLoad() async {
-    sprite = await gameRef.loadSprite('power_ups/oro.png');
+    // Usar el sprite del vehículo seleccionado
+    sprite = await gameRef.loadSprite(moneySpritePath);
+
+    priority = 50;
 
     double maxWidth = gameRef.laneWidth * 0.40;
     double ratio = sprite!.srcSize.y / sprite!.srcSize.x;

@@ -56,6 +56,9 @@ class ObstacleManager extends Component with HasGameRef<MyGame> {
         player: player,
         startPosition: Vector2(gameRef.size.x + 50, spawnY),
         isHorizontalMode: true,
+        obstacleSpritePath: gameRef
+            .selectedVehicle
+            .obstacleSpritePath, // Usar sprite del vehículo
       );
       gameRef.add(obstacle);
     } else {
@@ -68,6 +71,9 @@ class ObstacleManager extends Component with HasGameRef<MyGame> {
         player: player,
         startPosition: Vector2(laneX, -100),
         isHorizontalMode: false,
+        obstacleSpritePath: gameRef
+            .selectedVehicle
+            .obstacleSpritePath, // Usar sprite del vehículo
       );
       gameRef.add(obstacle);
     }

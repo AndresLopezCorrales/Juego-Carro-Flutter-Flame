@@ -1,3 +1,4 @@
+import 'package:carreando/models/vehicle.dart';
 import 'package:flame/components.dart';
 import 'package:flame/events.dart';
 import 'package:flame/collisions.dart';
@@ -6,7 +7,10 @@ import '../main.dart';
 
 class Player extends SpriteComponent
     with HasGameRef<MyGame>, TapCallbacks, KeyboardHandler {
-  Player() : super(anchor: Anchor.center);
+  final Vehicle vehicle;
+  Player({required this.vehicle}) : super(anchor: Anchor.center) {
+    priority = 100;
+  }
 
   int lane = 0;
   late List<double> lanePositions;
@@ -27,7 +31,7 @@ class Player extends SpriteComponent
 
   @override
   Future<void> onLoad() async {
-    sprite = await Sprite.load('cars/white_car.png');
+    sprite = await Sprite.load(vehicle.spritePath);
 
     double maxWidth = gameRef.laneWidth * 0.7;
     double ratio = sprite!.srcSize.y / sprite!.srcSize.x;
