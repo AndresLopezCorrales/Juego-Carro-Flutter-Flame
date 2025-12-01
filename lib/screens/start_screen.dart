@@ -1,9 +1,11 @@
 import 'package:carreando/data/vehicle.dart';
 import 'package:carreando/screens/leaderboard_screen.dart';
 import 'package:carreando/screens/options_screen.dart';
+import 'package:carreando/utils/platform_detector.dart'; // AGREGADO
 import 'package:flame/components.dart';
 import 'package:flame/events.dart';
 import 'package:flame/palette.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/painting.dart';
 import '../main.dart';
 
@@ -13,6 +15,7 @@ class StartScreen extends PositionComponent
   late TextPaint subtitlePaint;
   late TextPaint buttonPaint;
   late TextPaint arrowPaint;
+  late TextPaint audioHintPaint; // AGREGADO: para mensaje de audio en web
 
   // Lista para almacenar los sprites de los vehículos
   List<Sprite> vehicleSprites = [];
@@ -26,6 +29,9 @@ class StartScreen extends PositionComponent
   late Rect _optionsButtonArea;
   late Rect _creditsButtonArea;
 
+  // AGREGADO: Bandera para mostrar mensaje de audio en web
+  bool _showAudioHint = false;
+
   @override
   Future<void> onLoad() async {
     await super.onLoad();
@@ -34,6 +40,19 @@ class StartScreen extends PositionComponent
     _setupTextPaints();
     _calculateAreas();
     await _loadVehicleSprites();
+
+    // AGREGADO: Verificar si necesita mostrar mensaje de audio (solo web)
+    _checkAudioStatus();
+  }
+
+  // AGREGADO: Método para verificar estado del audio
+  void _checkAudioStatus() {
+    if (PlatformDetector.isWeb && !gameRef.audioManager.userInteracted) {
+      _showAudioHint = true;
+      print('Web: Mostrando mensaje de activación de audio');
+    } else {
+      _showAudioHint = false;
+    }
   }
 
   void _calculateAreas() {
@@ -41,10 +60,14 @@ class StartScreen extends PositionComponent
     final double screenWidth = size.x;
     final bool isHorizontal = screenWidth > screenHeight;
 
+    // AGREGADO: Si hay mensaje de audio, ajustar áreas
+    final double audioHintHeight = _showAudioHint ? screenHeight * 0.08 : 0;
+    final double startY = audioHintHeight;
+
     // Título: 12% de la pantalla
     _titleArea = Rect.fromLTWH(
       0,
-      screenHeight * 0.05,
+      startY + screenHeight * 0.05,
       screenWidth,
       screenHeight * 0.12,
     );
@@ -176,6 +199,23 @@ class StartScreen extends PositionComponent
         ],
       ),
     );
+
+    // AGREGADO: Texto para mensaje de audio en web
+    audioHintPaint = TextPaint(
+      style: TextStyle(
+        color: Colors.yellow, // Color amarillo para destacar
+        fontSize: baseSize * 0.9,
+        fontFamily: 'Arial',
+        fontWeight: FontWeight.bold,
+        shadows: [
+          Shadow(
+            color: BasicPalette.black.color,
+            blurRadius: 4.0,
+            offset: Offset(2.0, 2.0),
+          ),
+        ],
+      ),
+    );
   }
 
   double _calculateBaseFontSize() {
@@ -204,6 +244,11 @@ class StartScreen extends PositionComponent
       Paint()..color = BasicPalette.black.color.withOpacity(0.8),
     );
 
+    // AGREGADO: Renderizar mensaje de audio si es necesario
+    if (_showAudioHint) {
+      _renderAudioHint(canvas);
+    }
+
     // Renderizar cada sección en su área correspondiente
     _renderTitleSection(canvas);
     _renderVehicleSelectorSection(canvas);
@@ -211,6 +256,34 @@ class StartScreen extends PositionComponent
     _renderLeaderboardButtonSection(canvas);
     _renderOptionsButtonSection(canvas);
     _renderCreditsButtonSection(canvas);
+  }
+
+  // AGREGADO: Método para renderizar mensaje de audio
+  void _renderAudioHint(Canvas canvas) {
+    final message = 'TOCA LA PANTALLA PARA ACTIVAR EL AUDIO';
+    final textSize = _measureText(message, audioHintPaint);
+
+    // Posicionar en la parte superior
+    final double x = size.x / 2 - textSize.x / 2;
+    final double y = size.y * 0.03;
+
+    // Fondo para el mensaje
+    final backgroundRect = Rect.fromLTWH(
+      x - 15,
+      y - 8,
+      textSize.x + 30,
+      textSize.y + 16,
+    );
+
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(backgroundRect, Radius.circular(20)),
+      Paint()
+        ..color = Colors.black.withOpacity(0.7)
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, 4.0),
+    );
+
+    // Texto del mensaje
+    audioHintPaint.render(canvas, message, Vector2(x, y));
   }
 
   void _renderTitleSection(Canvas canvas) {
@@ -376,7 +449,7 @@ class StartScreen extends PositionComponent
     final buttonTextSize = _measureText(text, buttonPaint);
 
     // Botón ocupa 50% del ancho del área (más estrecho) y 100% del alto del área
-    final double buttonWidth = area.width * 0.45;
+    final double buttonWidth = area.width * 0.50;
     final double buttonHeight = area.height;
 
     final buttonX = area.center.dx - (buttonWidth / 2);
@@ -455,18 +528,63 @@ class StartScreen extends PositionComponent
 
     final tapPosition = event.localPosition;
 
-    // Verificar en qué área se hizo tap
+    // AGREGADO: PRIMERO manejar la activación del audio si es web
+    if (PlatformDetector.isWeb && !gameRef.audioManager.userInteracted) {
+      _handleFirstWebInteraction();
+
+      // Si el tap fue en el mensaje de audio, no procesar botones
+      final double audioHintHeight = size.y * 0.08;
+      final Rect audioHintArea = Rect.fromLTWH(0, 0, size.x, audioHintHeight);
+
+      if (audioHintArea.contains(tapPosition.toOffset())) {
+        return; // Solo activar audio, no procesar botones
+      }
+    }
+
+    // Luego verificar en qué área se hizo tap para las funcionalidades
     if (_playButtonArea.contains(tapPosition.toOffset())) {
-      gameRef.startGame();
+      _onPlayButtonPressed();
     } else if (_leaderboardButtonArea.contains(tapPosition.toOffset())) {
-      _goToLeaderboardScreen();
+      _onLeaderboardButtonPressed();
     } else if (_optionsButtonArea.contains(tapPosition.toOffset())) {
-      _goToOptionsScreen();
+      _onOptionsButtonPressed();
     } else if (_creditsButtonArea.contains(tapPosition.toOffset())) {
-      print('Créditos - Por implementar');
+      _onCreditsButtonPressed();
     } else if (_vehicleSelectorArea.contains(tapPosition.toOffset())) {
       _handleVehicleSelectorTap(tapPosition);
     }
+  }
+
+  // AGREGADO: Manejar primera interacción en web
+  void _handleFirstWebInteraction() {
+    print('🎵 Web: Primer tap detectado - activando audio');
+
+    // Activar el audio
+    gameRef.audioManager.markUserInteraction();
+
+    // Ocultar mensaje de audio
+    _showAudioHint = false;
+
+    // Recalcular áreas sin el mensaje
+    _calculateAreas();
+
+    print('✅ Audio activado correctamente');
+  }
+
+  void _onPlayButtonPressed() {
+    gameRef.startGame();
+  }
+
+  void _onLeaderboardButtonPressed() {
+    _goToLeaderboardScreen();
+  }
+
+  void _onOptionsButtonPressed() {
+    _goToOptionsScreen();
+  }
+
+  void _onCreditsButtonPressed() {
+    print('Créditos - Por implementar');
   }
 
   void _goToOptionsScreen() {
@@ -529,6 +647,10 @@ class StartScreen extends PositionComponent
     super.onGameResize(size);
     this.size = size;
     position = Vector2.zero();
+
+    // Re-verificar estado del audio
+    _checkAudioStatus();
+
     _calculateAreas();
     _setupTextPaints();
   }

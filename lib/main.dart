@@ -1,5 +1,6 @@
 import 'package:carreando/config/supabase_config.dart';
 import 'package:carreando/data/vehicle.dart';
+import 'package:carreando/managers/audio_manager.dart';
 import 'package:carreando/managers/usuario_manager.dart';
 import 'package:carreando/models/vehicle.dart';
 import 'package:carreando/screens/game_over_screen.dart';
@@ -89,12 +90,20 @@ class MyGame extends FlameGame
   // Gestión de usuario
   final UsuarioManager usuarioManager = UsuarioManager();
 
+  final audioManager = AudioManager();
+
   @override
   Future<void> onLoad() async {
     await super.onLoad();
     await usuarioManager.cargarUsuarioGuardado();
     await _loadOrientationPreference();
     await _loadVehiclePreference();
+
+    // Inicializar audio
+    await audioManager.initialize();
+
+    audioManager.playBgm('bgm.mp3');
+
     await _showStartScreen();
   }
 

@@ -1,3 +1,4 @@
+import 'package:carreando/managers/audio_manager.dart';
 import 'package:flame/components.dart';
 import 'package:flame/collisions.dart';
 
@@ -60,6 +61,7 @@ class Obstacle extends SpriteComponent
     if (hit) return;
     if (other is Player) {
       hit = true;
+      AudioManager().playSfx('explosion.wav');
       fuelManager.loseFuel(20);
       removeFromParent();
     }

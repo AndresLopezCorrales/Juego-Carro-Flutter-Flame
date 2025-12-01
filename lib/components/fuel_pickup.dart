@@ -1,3 +1,4 @@
+import 'package:carreando/managers/audio_manager.dart';
 import 'package:flame/components.dart';
 import 'package:flame/collisions.dart';
 import 'package:flame/game.dart';
@@ -56,6 +57,7 @@ class FuelPickup extends SpriteComponent
   @override
   void onCollisionStart(Set<Vector2> points, PositionComponent other) {
     if (other is Player) {
+      AudioManager().playSfx('recarga.wav');
       fuelManager.addFuel(30);
       removeFromParent();
     }

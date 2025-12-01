@@ -1,3 +1,4 @@
+import 'package:carreando/managers/audio_manager.dart';
 import 'package:flame/components.dart';
 import 'package:flame/collisions.dart';
 import 'package:flame/game.dart';
@@ -56,7 +57,7 @@ class GoldCoin extends SpriteComponent
         removeFromParent();
         return;
       }
-
+      AudioManager().playSfx('agarrar_oro.wav');
       gameRef.score += 20;
       gameRef.difficultyMultiplier += 0.15;
       removeFromParent();
