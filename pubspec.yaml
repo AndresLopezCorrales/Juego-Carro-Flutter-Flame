@@ -91,6 +91,7 @@ flutter:
     - assets/images/power_ups/normal/dinero.png
     - assets/images/power_ups/bosque/dinero.png
     - assets/images/power_ups/espacio/dinero.png
+    - assets/images/explosion/
     - assets/.env
     - assets/audio/
   # An image asset can refer to one or more resolution-specific "variants", see

@@ -1,4 +1,6 @@
+import 'package:carreando/components/animations/explosion.dart';
 import 'package:carreando/main.dart';
+import 'package:carreando/managers/audio_manager.dart';
 import 'package:flame/components.dart';
 
 class FuelManager extends Component with HasGameRef<MyGame> {
@@ -12,6 +14,8 @@ class FuelManager extends Component with HasGameRef<MyGame> {
   // Gasolina que drena por segundo en carriles extremos
   double extremeLaneFuelDrain = 0.8;
   double _extremeLaneTimer = 0.0;
+
+  bool _explosionShown = false; // Para evitar múltiples explosiones
 
   @override
   void update(double dt) {
@@ -37,6 +41,25 @@ class FuelManager extends Component with HasGameRef<MyGame> {
     if (fuel < 0) {
       fuel = 0;
     }
+
+    // Mostrar explosión cuando se acaba la gasolina
+    if (isEmpty && !_explosionShown) {
+      _showExplosion();
+      _explosionShown = true;
+    }
+  }
+
+  void _showExplosion() {
+    if (game.player == null) return;
+
+    final explosion = ExplosionSimple(
+      position: game.player!.position,
+      size: Vector2(150, 150),
+    );
+
+    explosion.priority = 1000;
+    AudioManager().playSfx('colision.wav');
+    game.add(explosion);
   }
 
   // Restar gasolina por daño / choque
@@ -63,5 +86,6 @@ class FuelManager extends Component with HasGameRef<MyGame> {
 
   void reset() {
     fuel = maxFuel;
+    _explosionShown = false;
   }
 }
