@@ -6,6 +6,7 @@ import 'package:carreando/models/vehicle.dart';
 import 'package:carreando/screens/game_over_screen.dart';
 import 'package:carreando/screens/start_screen.dart';
 import 'package:carreando/services/supabase_service.dart';
+import 'package:carreando/utils/platform_detector.dart';
 import 'package:flame/events.dart';
 import 'package:flame/game.dart';
 import 'package:flame/components.dart';
@@ -112,16 +113,33 @@ class MyGame extends FlameGame
   @override
   Future<void> onLoad() async {
     await super.onLoad();
+
+    // Precargar assets importantes para Android
+    if (PlatformDetector.isAndroid) {
+      await _preloadImportantAssets();
+    }
+
     await usuarioManager.cargarUsuarioGuardado();
     await _loadOrientationPreference();
     await _loadVehiclePreference();
 
     // Inicializar audio
     await audioManager.initialize();
-
     audioManager.playBgm('bgm.mp3');
 
     await _showStartScreen();
+  }
+
+  Future<void> _preloadImportantAssets() async {
+    // Precargar sprites del vehículo seleccionado
+    try {
+      await Sprite.load(selectedVehicle.sideSpritePath);
+      await Sprite.load(selectedVehicle.roadSpritePath);
+      await Sprite.load(selectedVehicle.sideHorizontalSpritePath);
+      await Sprite.load(selectedVehicle.roadHorizontalSpritePath);
+    } catch (e) {
+      print('ERROR precargando assets: $e');
+    }
   }
 
   //UPDATE DEL JUEGO
@@ -134,21 +152,25 @@ class MyGame extends FlameGame
       // Calcular scroll speed actualizado con la dificultad
       double currentScrollSpeed = scrollSpeed * difficultyMultiplier;
 
-      // Scroll según el modo
-      if (_isHorizontalMode) {
-        _scrollHorizontalBackgrounds(dt, currentScrollSpeed);
-      } else {
-        _scrollVerticalBackgrounds(dt, currentScrollSpeed);
+      // SOLO HACER SCROLL SI NO ES ANDROID
+      // Si es Android, el fondo será estático
+      if (!PlatformDetector.isAndroid) {
+        // Scroll según el modo
+        if (_isHorizontalMode) {
+          _scrollHorizontalBackgrounds(dt, currentScrollSpeed);
+        } else {
+          _scrollVerticalBackgrounds(dt, currentScrollSpeed);
+        }
       }
 
-      // Dificultad
+      // Dificultad (siempre se aplica, incluso en Android)
       timePassed += dt;
       if (timePassed >= 1.0) {
         difficultyMultiplier += difficultyIncreaseRate;
         timePassed = 0.0;
       }
 
-      // Puntos por tiempo
+      // Puntos por tiempo (siempre se aplica)
       _scoreTimer += dt;
       if (_scoreTimer >= 1.0) {
         score += 10;
@@ -202,7 +224,6 @@ class MyGame extends FlameGame
         globalHighScore = score;
       }
     } catch (e) {
-      print('Error obteniendo high score: $e');
       globalHighScore = score;
     }
   }
@@ -394,6 +415,30 @@ class MyGame extends FlameGame
     add(gameHUD!);
     gameHUD!.position = Vector2.zero();
     gameHUD!.size = size;
+
+    // Ajustar para Android después de inicializar
+    _adjustForAndroid();
+  }
+
+  void _adjustForAndroid() {
+    if (PlatformDetector.isAndroid) {
+      // Reducir velocidad de scroll (aunque no se usará)
+      scrollSpeed = 0;
+
+      // Ajustar dificultad si es necesario
+      difficultyIncreaseRate = 0.02;
+
+      // Ajustar tamaño del jugador si es necesario y seguro
+      if (player != null && player!.isLoaded && laneWidth > 0) {
+        double targetWidth = laneWidth * 0.8;
+        if (player!.width > 0) {
+          player!.scale = Vector2.all(targetWidth / player!.width);
+        } else {
+          // Fallback si width es 0
+          player!.size = Vector2(targetWidth, targetWidth * 1.5);
+        }
+      }
+    }
   }
 
   //INICIALIZACIÓN DEL JUEGO
@@ -411,20 +456,110 @@ class MyGame extends FlameGame
   //INICIALIZACIÓN VERTICAL Y HORIZONTAL
 
   Future<void> _initializeVerticalGame() async {
-    final Sprite sideSprite = await Sprite.load(selectedVehicle.sideSpritePath);
+    try {
+      // Precargar sprites
+      final Sprite sideSprite = await Sprite.load(
+        selectedVehicle.sideSpritePath,
+      );
+      final Sprite centerSprite = await Sprite.load(
+        selectedVehicle.roadSpritePath,
+      );
+
+      sideWidth = size.x * 0.18;
+
+      // EN ANDROID: Usar sprites ya cargados
+      if (PlatformDetector.isAndroid) {
+        await _createAndroidVerticalBackground(sideSprite, centerSprite);
+      } else {
+        await _createScrollingSideBackground(sideSprite);
+        await _createScrollingCenterBackground();
+      }
+
+      _calculateLanes();
+      _initializeManagers();
+    } catch (e) {
+      // Fallback a modo horizontal si falla
+      _isHorizontalMode = !_isHorizontalMode;
+      saveOrientationPreference();
+      startGame();
+    }
+  }
+
+  Future<void> _createAndroidVerticalBackground(
+    Sprite sideSprite,
+    Sprite centerSprite,
+  ) async {
     sideWidth = size.x * 0.18;
+    double centerWidth = size.x - (sideWidth * 2);
 
-    await _createScrollingSideBackground(sideSprite);
-    await _createScrollingCenterBackground();
+    // FONDO LATERAL
+    final bgSize = Vector2(size.x, size.y);
+    leftBg1 = SpriteComponent(sprite: sideSprite, size: bgSize);
+    leftBg1!.position = Vector2(0, 0);
+    leftBg1!.priority = 0;
+    add(leftBg1!);
 
-    _calculateLanes();
-    _initializeManagers();
+    // CARRETERA CENTRAL
+    final centerBgSize = Vector2(centerWidth, size.y);
+    centerBg1 = SpriteComponent(
+      sprite: centerSprite,
+      size: centerBgSize,
+      position: Vector2(sideWidth, 0),
+      priority: 10,
+    );
+    add(centerBg1!);
   }
 
   Future<void> _initializeHorizontalGame() async {
-    await _createScrollingHorizontalBackgrounds();
-    _calculateLanes();
-    _initializeManagers();
+    try {
+      // Precargar sprites
+      final Sprite sideSprite = await Sprite.load(
+        selectedVehicle.sideHorizontalSpritePath,
+      );
+      final Sprite centerSprite = await Sprite.load(
+        selectedVehicle.roadHorizontalSpritePath,
+      );
+
+      // EN ANDROID: Usar sprites ya cargados
+      if (PlatformDetector.isAndroid) {
+        await _createAndroidHorizontalBackground(sideSprite, centerSprite);
+      } else {
+        await _createScrollingHorizontalBackgrounds();
+      }
+
+      _calculateLanes();
+      _initializeManagers();
+    } catch (e) {
+      // Fallback a modo vertical si falla
+      _isHorizontalMode = !_isHorizontalMode;
+      saveOrientationPreference();
+      startGame();
+    }
+  }
+
+  Future<void> _createAndroidHorizontalBackground(
+    Sprite sideSprite,
+    Sprite centerSprite,
+  ) async {
+    sideWidth = size.y * 0.18;
+    double centerHeight = size.y - (sideWidth * 2);
+
+    // FONDOS SUPERIORES
+    final fullBgSize = Vector2(size.x, size.y);
+    topBg1 = SpriteComponent(sprite: sideSprite, size: fullBgSize);
+    topBg1!.position = Vector2(0, 0);
+    topBg1!.priority = 0;
+    add(topBg1!);
+
+    // CARRETERA CENTRAL
+    final centerSize = Vector2(size.x, centerHeight);
+    centerHorizontalBg1 = SpriteComponent(
+      sprite: centerSprite,
+      size: centerSize,
+      position: Vector2(0, sideWidth),
+      priority: 10,
+    );
+    add(centerHorizontalBg1!);
   }
 
   //CÁLCULO DE CARRILES
@@ -502,44 +637,68 @@ class MyGame extends FlameGame
     // FONDOS COMPLETOS (side)
     final fullBgSize = Vector2(size.x, size.y);
 
-    topBg1 = SpriteComponent(sprite: sideSprite, size: fullBgSize);
-    topBg2 = SpriteComponent(sprite: sideSprite, size: fullBgSize);
+    // EN ANDROID: Usar solo UN fondo (sin duplicado para scroll)
+    if (PlatformDetector.isAndroid) {
+      // Solo un fondo estático
+      topBg1 = SpriteComponent(sprite: sideSprite, size: fullBgSize);
+      topBg1!.position = Vector2(0, 0);
+      topBg1!.priority = 0;
+      add(topBg1!);
+    } else {
+      // Para otras plataformas: dos fondos para scroll
+      topBg1 = SpriteComponent(sprite: sideSprite, size: fullBgSize);
+      topBg2 = SpriteComponent(sprite: sideSprite, size: fullBgSize);
 
-    topBg1!.position = Vector2(0, 0);
-    topBg2!.position = Vector2(size.x, 0);
+      topBg1!.position = Vector2(0, 0);
+      topBg2!.position = Vector2(size.x, 0);
 
-    // PRIORIDAD MÁS BAJA para el fondo side
-    topBg1!.priority = 0;
-    topBg2!.priority = 0;
+      topBg1!.priority = 0;
+      topBg2!.priority = 0;
 
-    add(topBg1!);
-    add(topBg2!);
+      add(topBg1!);
+      add(topBg2!);
+    }
 
     // CARRETERA CENTRAL
     final centerSize = Vector2(size.x, centerHeight);
 
-    centerHorizontalBg1 = SpriteComponent(
-      sprite: centerSprite,
-      size: centerSize,
-    );
-    centerHorizontalBg2 = SpriteComponent(
-      sprite: centerSprite,
-      size: centerSize,
-    );
+    // EN ANDROID: Solo una carretera estática
+    if (PlatformDetector.isAndroid) {
+      centerHorizontalBg1 = SpriteComponent(
+        sprite: centerSprite,
+        size: centerSize,
+        position: Vector2(0, sideWidth),
+        priority: 10,
+      );
+      add(centerHorizontalBg1!);
+    } else {
+      centerHorizontalBg1 = SpriteComponent(
+        sprite: centerSprite,
+        size: centerSize,
+      );
+      centerHorizontalBg2 = SpriteComponent(
+        sprite: centerSprite,
+        size: centerSize,
+      );
 
-    centerHorizontalBg1!.position = Vector2(0, sideWidth);
-    centerHorizontalBg2!.position = Vector2(size.x, sideWidth);
+      centerHorizontalBg1!.position = Vector2(0, sideWidth);
+      centerHorizontalBg2!.position = Vector2(size.x, sideWidth);
 
-    // PRIORIDAD BAJA para la calle (debajo de jugador y objetos)
-    centerHorizontalBg1!.priority = 10;
-    centerHorizontalBg2!.priority = 10;
+      centerHorizontalBg1!.priority = 10;
+      centerHorizontalBg2!.priority = 10;
 
-    add(centerHorizontalBg1!);
-    add(centerHorizontalBg2!);
+      add(centerHorizontalBg1!);
+      add(centerHorizontalBg2!);
+    }
   }
 
   void _scrollHorizontalBackgrounds(double dt, double currentSpeed) {
-    // Scroll para fondos horizontales
+    // EN ANDROID: No hacer scroll
+    if (PlatformDetector.isAndroid) {
+      return;
+    }
+
+    // Scroll para fondos horizontales (solo otras plataformas)
     if (topBg1 != null) _scrollHorizontal(topBg1!, dt, currentSpeed);
     if (topBg2 != null) _scrollHorizontal(topBg2!, dt, currentSpeed);
     if (centerHorizontalBg1 != null)
@@ -564,6 +723,11 @@ class MyGame extends FlameGame
   }
 
   void _scrollVerticalBackgrounds(double dt, double currentSpeed) {
+    // EN ANDROID: No hacer scroll
+    if (PlatformDetector.isAndroid) {
+      return;
+    }
+
     if (leftBg1 != null) _scrollVertical(leftBg1!, dt, currentSpeed);
     if (leftBg2 != null) _scrollVertical(leftBg2!, dt, currentSpeed);
     if (centerBg1 != null) _scrollVertical(centerBg1!, dt, currentSpeed);
@@ -583,21 +747,30 @@ class MyGame extends FlameGame
   }
 
   Future<void> _createScrollingSideBackground(Sprite sprite) async {
-    // El side ahora ocupa toda la pantalla de fondo
-    final bgSize = Vector2(size.x, size.y);
+    // EN ANDROID: Solo un fondo estático
+    if (PlatformDetector.isAndroid) {
+      final bgSize = Vector2(size.x, size.y);
+      leftBg1 = SpriteComponent(sprite: sprite, size: bgSize);
+      leftBg1!.position = Vector2(0, 0);
+      leftBg1!.priority = 0;
+      add(leftBg1!);
+    } else {
+      // El side ahora ocupa toda la pantalla de fondo
+      final bgSize = Vector2(size.x, size.y);
 
-    leftBg1 = SpriteComponent(sprite: sprite, size: bgSize);
-    leftBg2 = SpriteComponent(sprite: sprite, size: bgSize);
+      leftBg1 = SpriteComponent(sprite: sprite, size: bgSize);
+      leftBg2 = SpriteComponent(sprite: sprite, size: bgSize);
 
-    leftBg1!.position = Vector2(0, 0);
-    leftBg2!.position = Vector2(0, -size.y);
+      leftBg1!.position = Vector2(0, 0);
+      leftBg2!.position = Vector2(0, -size.y);
 
-    // PRIORIDAD MÁS BAJA para el fondo side
-    leftBg1!.priority = 0;
-    leftBg2!.priority = 0;
+      // PRIORIDAD MÁS BAJA para el fondo side
+      leftBg1!.priority = 0;
+      leftBg2!.priority = 0;
 
-    add(leftBg1!);
-    add(leftBg2!);
+      add(leftBg1!);
+      add(leftBg2!);
+    }
   }
 
   Future<void> _createScrollingCenterBackground() async {
@@ -608,18 +781,29 @@ class MyGame extends FlameGame
     double centerWidth = size.x - (sideWidth * 2);
     final bgSize = Vector2(centerWidth, size.y);
 
-    centerBg1 = SpriteComponent(sprite: centerSprite, size: bgSize);
-    centerBg2 = SpriteComponent(sprite: centerSprite, size: bgSize);
+    // EN ANDROID: Solo un fondo central estático
+    if (PlatformDetector.isAndroid) {
+      centerBg1 = SpriteComponent(
+        sprite: centerSprite,
+        size: bgSize,
+        position: Vector2(sideWidth, 0),
+        priority: 10,
+      );
+      add(centerBg1!);
+    } else {
+      centerBg1 = SpriteComponent(sprite: centerSprite, size: bgSize);
+      centerBg2 = SpriteComponent(sprite: centerSprite, size: bgSize);
 
-    centerBg1!.position = Vector2(sideWidth, 0);
-    centerBg2!.position = Vector2(sideWidth, -size.y);
+      centerBg1!.position = Vector2(sideWidth, 0);
+      centerBg2!.position = Vector2(sideWidth, -size.y);
 
-    // PRIORIDAD BAJA para la calle (debajo de jugador y objetos)
-    centerBg1!.priority = 10;
-    centerBg2!.priority = 10;
+      // PRIORIDAD BAJA para la calle (debajo de jugador y objetos)
+      centerBg1!.priority = 10;
+      centerBg2!.priority = 10;
 
-    add(centerBg1!);
-    add(centerBg2!);
+      add(centerBg1!);
+      add(centerBg2!);
+    }
   }
 
   //ONGAME RESIZE
@@ -631,6 +815,7 @@ class MyGame extends FlameGame
       return;
     }
 
+    // Actualizar pantallas
     if (startScreen != null && startScreen!.isLoaded) {
       startScreen!.size = size;
       startScreen!.position = Vector2.zero();
@@ -646,108 +831,281 @@ class MyGame extends FlameGame
       gameHUD!.position = Vector2.zero();
     }
 
+    // Si el juego no ha empezado, solo actualizar pantallas
     if (!_gameStarted) {
       return;
     }
 
-    if (_isHorizontalMode) {
-      _resizeHorizontalGame();
+    // EN ANDROID: Manejo especial para rotación
+    if (PlatformDetector.isAndroid) {
+      _handleAndroidResize();
     } else {
-      _resizeVerticalGame();
+      // Para otras plataformas, comportamiento normal
+      if (_isHorizontalMode) {
+        _resizeHorizontalGame();
+      } else {
+        _resizeVerticalGame();
+      }
+    }
+  }
+
+  void _handleAndroidResize() {
+    try {
+      // Recalcular lanes primero (esto es seguro)
+      _calculateLanes();
+
+      // Actualizar jugador si existe
+      if (player != null && player!.isLoaded) {
+        player!.setLanePositions(lanes);
+
+        // Recalcular posición según modo
+        if (_isHorizontalMode) {
+          player!.position = Vector2(size.x * 0.15, lanes[player!.lane]);
+        } else {
+          player!.position = Vector2(lanes[player!.lane], size.y * 0.85);
+        }
+
+        // Recalcular escala
+        double targetWidth = laneWidth * 0.8; // Android usa 0.8
+        if (player!.width > 0) {
+          player!.scale = Vector2.all(targetWidth / player!.width);
+        }
+      }
+
+      // **EN ANDROID: RECREAR FONDOS COMPLETAMENTE**
+      // Los fondos estáticos necesitan ser recreados al rotar
+
+      // Limpiar fondos existentes
+      _clearAndroidBackgrounds();
+
+      // Recrear fondos según el modo actual
+      if (_isHorizontalMode) {
+        _recreateHorizontalBackgroundsForAndroid();
+      } else {
+        _recreateVerticalBackgroundsForAndroid();
+      }
+
+      // Actualizar managers
+      if (pickupManager != null) {
+        pickupManager!.updateLanes(lanes);
+      }
+
+      if (obstacleManager != null) {
+        obstacleManager!.updateLanes(lanes);
+      }
+    } catch (e) {
+      // En caso de error, intentar reiniciar el juego
+      _recoverFromAndroidResizeError();
+    }
+  }
+
+  void _clearAndroidBackgrounds() {
+    // Crear lista de componentes a remover
+    final componentsToRemove = <Component>[];
+
+    // Agregar todos los SpriteComponents que sean fondos
+    for (var child in children) {
+      if (child is SpriteComponent &&
+          child != player &&
+          child != fuelManager &&
+          child != pickupManager &&
+          child != obstacleManager &&
+          !(child is GameHUD) &&
+          !(child is StartScreen) &&
+          !(child is GameOverScreen)) {
+        componentsToRemove.add(child);
+      }
+    }
+
+    // Remover componentes
+    for (var component in componentsToRemove) {
+      component.removeFromParent();
+    }
+
+    // Limpiar referencias
+    leftBg1 = leftBg2 = null;
+    centerBg1 = centerBg2 = null;
+    topBg1 = topBg2 = null;
+    centerHorizontalBg1 = centerHorizontalBg2 = null;
+  }
+
+  Future<void> _recreateHorizontalBackgroundsForAndroid() async {
+    try {
+      final Sprite sideSprite = await Sprite.load(
+        selectedVehicle.sideHorizontalSpritePath,
+      );
+      final Sprite centerSprite = await Sprite.load(
+        selectedVehicle.roadHorizontalSpritePath,
+      );
+
+      sideWidth = size.y * 0.18;
+      double centerHeight = size.y - (sideWidth * 2);
+
+      // FONDOS SUPERIORES
+      final fullBgSize = Vector2(size.x, size.y);
+      topBg1 = SpriteComponent(sprite: sideSprite, size: fullBgSize);
+      topBg1!.position = Vector2(0, 0);
+      topBg1!.priority = 0;
+      add(topBg1!);
+
+      // CARRETERA CENTRAL
+      final centerSize = Vector2(size.x, centerHeight);
+      centerHorizontalBg1 = SpriteComponent(
+        sprite: centerSprite,
+        size: centerSize,
+        position: Vector2(0, sideWidth),
+        priority: 10,
+      );
+      add(centerHorizontalBg1!);
+    } catch (e) {
+      print('ERROR recreando fondos horizontales: $e');
+      throw e;
+    }
+  }
+
+  Future<void> _recreateVerticalBackgroundsForAndroid() async {
+    try {
+      final Sprite sideSprite = await Sprite.load(
+        selectedVehicle.sideSpritePath,
+      );
+      final Sprite centerSprite = await Sprite.load(
+        selectedVehicle.roadSpritePath,
+      );
+
+      sideWidth = size.x * 0.18;
+      double centerWidth = size.x - (sideWidth * 2);
+
+      // FONDO LATERAL
+      final bgSize = Vector2(size.x, size.y);
+      leftBg1 = SpriteComponent(sprite: sideSprite, size: bgSize);
+      leftBg1!.position = Vector2(0, 0);
+      leftBg1!.priority = 0;
+      add(leftBg1!);
+
+      // CARRETERA CENTRAL
+      final centerBgSize = Vector2(centerWidth, size.y);
+      centerBg1 = SpriteComponent(
+        sprite: centerSprite,
+        size: centerBgSize,
+        position: Vector2(sideWidth, 0),
+        priority: 10,
+      );
+      add(centerBg1!);
+    } catch (e) {
+      print('ERROR recreando fondos verticales: $e');
+      throw e;
+    }
+  }
+
+  void _recoverFromAndroidResizeError() {
+    // Si hay un error crítico, mostrar pantalla de inicio
+    if (_gameStarted && !_gameOver) {
+      _gameOver = true;
+      Future.delayed(Duration(milliseconds: 500), () {
+        goToStartScreen();
+      });
     }
   }
 
   void _resizeVerticalGame() {
-    final Vector2 oldSize = this.size;
+    try {
+      final Vector2 oldSize = this.size;
 
-    sideWidth = size.x * 0.18;
-    double centerWidth = size.x - (sideWidth * 2);
+      sideWidth = size.x * 0.18;
+      double centerWidth = size.x - (sideWidth * 2);
 
-    double minLaneWidth = 70; // Reducido para pantallas grandes
-    int numCentralLanes = (centerWidth / minLaneWidth).floor();
-    numCentralLanes = numCentralLanes.clamp(3, 5);
-    laneWidth = centerWidth / numCentralLanes;
+      double minLaneWidth = 70; // Reducido para pantallas grandes
+      int numCentralLanes = (centerWidth / minLaneWidth).floor();
+      numCentralLanes = numCentralLanes.clamp(3, 5);
+      laneWidth = centerWidth / numCentralLanes;
 
-    lanes = [];
-    lanes.add(sideWidth * 0.35);
-    for (int i = 0; i < numCentralLanes; i++) {
-      double cx = sideWidth + (laneWidth * i) + (laneWidth / 2);
-      lanes.add(cx);
+      lanes = [];
+      lanes.add(sideWidth * 0.35);
+      for (int i = 0; i < numCentralLanes; i++) {
+        double cx = sideWidth + (laneWidth * i) + (laneWidth / 2);
+        lanes.add(cx);
+      }
+      lanes.add(size.x - (sideWidth * 0.35));
+
+      if (leftBg1 != null) _resizeSideBackgrounds(oldSize);
+      if (centerBg1 != null) _resizeCenterBackground(oldSize);
+
+      if (player != null && player!.isLoaded) {
+        player!.setLanePositions(lanes);
+        double targetWidth = laneWidth * 0.7;
+        double currentWidth = player!.width;
+        double scale = targetWidth / currentWidth;
+        player!.scale = Vector2.all(scale);
+        player!.position = Vector2(lanes[player!.lane], size.y * 0.85);
+      }
+
+      if (pickupManager != null) pickupManager!.updateLanes(lanes);
+      if (obstacleManager != null) obstacleManager!.updateLanes(lanes);
+    } catch (e) {
+      print('ERROR en _resizeVerticalGame: $e');
     }
-    lanes.add(size.x - (sideWidth * 0.35));
-
-    if (leftBg1 != null) _resizeSideBackgrounds(oldSize);
-    if (centerBg1 != null) _resizeCenterBackground(oldSize);
-
-    if (player != null && player!.isLoaded) {
-      player!.setLanePositions(lanes);
-      double targetWidth = laneWidth * 0.7;
-      double currentWidth = player!.width;
-      double scale = targetWidth / currentWidth;
-      player!.scale = Vector2.all(scale);
-      player!.position = Vector2(lanes[player!.lane], size.y * 0.85);
-    }
-
-    if (pickupManager != null) pickupManager!.updateLanes(lanes);
-    if (obstacleManager != null) obstacleManager!.updateLanes(lanes);
   }
 
   void _resizeHorizontalGame() {
-    final Vector2 oldSize = this.size;
+    try {
+      final Vector2 oldSize = this.size;
 
-    sideWidth = size.y * 0.18;
-    double centerHeight = size.y - (sideWidth * 2);
+      sideWidth = size.y * 0.18;
+      double centerHeight = size.y - (sideWidth * 2);
 
-    double minLaneWidth = 70;
-    int numCentralLanes = (centerHeight / minLaneWidth).floor();
-    numCentralLanes = numCentralLanes.clamp(3, 5);
-    laneWidth = centerHeight / numCentralLanes;
+      double minLaneWidth = 70;
+      int numCentralLanes = (centerHeight / minLaneWidth).floor();
+      numCentralLanes = numCentralLanes.clamp(3, 5);
+      laneWidth = centerHeight / numCentralLanes;
 
-    lanes = [];
-    lanes.add(sideWidth * 0.35);
-    for (int i = 0; i < numCentralLanes; i++) {
-      double cy = sideWidth + (laneWidth * i) + (laneWidth / 2);
-      lanes.add(cy);
+      lanes = [];
+      lanes.add(sideWidth * 0.35);
+      for (int i = 0; i < numCentralLanes; i++) {
+        double cy = sideWidth + (laneWidth * i) + (laneWidth / 2);
+        lanes.add(cy);
+      }
+      lanes.add(size.y - (sideWidth * 0.35));
+
+      final fullBgSize = Vector2(size.x, size.y);
+      final centerSize = Vector2(size.x, centerHeight);
+
+      // Actualizar fondos completos
+      if (topBg1 != null && topBg2 != null) {
+        _resizeHorizontalBackgroundPair(
+          topBg1!,
+          topBg2!,
+          oldSize,
+          fullBgSize,
+          0, // Y position 0 porque ahora ocupa toda la pantalla
+        );
+      }
+
+      // Actualizar carretera central
+      if (centerHorizontalBg1 != null && centerHorizontalBg2 != null) {
+        _resizeHorizontalBackgroundPair(
+          centerHorizontalBg1!,
+          centerHorizontalBg2!,
+          oldSize,
+          centerSize,
+          sideWidth,
+        );
+      }
+
+      // Actualizar jugador para modo horizontal
+      if (player != null && player!.isLoaded) {
+        player!.setLanePositions(lanes);
+        double targetWidth = laneWidth * 0.7;
+        double currentWidth = player!.width;
+        double scale = targetWidth / currentWidth;
+        player!.scale = Vector2.all(scale);
+        player!.position = Vector2(size.x * 0.15, lanes[player!.lane]);
+      }
+
+      if (pickupManager != null) pickupManager!.updateLanes(lanes);
+      if (obstacleManager != null) obstacleManager!.updateLanes(lanes);
+    } catch (e) {
+      print('ERROR en _resizeHorizontalGame: $e');
     }
-    lanes.add(size.y - (sideWidth * 0.35));
-
-    final fullBgSize = Vector2(size.x, size.y);
-    final centerSize = Vector2(size.x, centerHeight);
-
-    // Actualizar fondos completos
-    if (topBg1 != null && topBg2 != null) {
-      _resizeHorizontalBackgroundPair(
-        topBg1!,
-        topBg2!,
-        oldSize,
-        fullBgSize,
-        0, // Y position 0 porque ahora ocupa toda la pantalla
-      );
-    }
-
-    // Actualizar carretera central
-    if (centerHorizontalBg1 != null && centerHorizontalBg2 != null) {
-      _resizeHorizontalBackgroundPair(
-        centerHorizontalBg1!,
-        centerHorizontalBg2!,
-        oldSize,
-        centerSize,
-        sideWidth,
-      );
-    }
-
-    // Actualizar jugador para modo horizontal
-    if (player != null && player!.isLoaded) {
-      player!.setLanePositions(lanes);
-      double targetWidth = laneWidth * 0.7;
-      double currentWidth = player!.width;
-      double scale = targetWidth / currentWidth;
-      player!.scale = Vector2.all(scale);
-      player!.position = Vector2(size.x * 0.15, lanes[player!.lane]);
-    }
-
-    if (pickupManager != null) pickupManager!.updateLanes(lanes);
-    if (obstacleManager != null) obstacleManager!.updateLanes(lanes);
   }
 
   void _resizeHorizontalBackgroundPair(

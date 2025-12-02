@@ -1,6 +1,6 @@
 // lib/managers/audio_manager.dart
 import 'package:flame_audio/flame_audio.dart';
-import '../utils/platform_detector.dart'; // Agregar esta línea
+import '../utils/platform_detector.dart';
 
 class AudioManager {
   // Singleton pattern
@@ -32,14 +32,10 @@ class AudioManager {
       // **CRÍTICO: Si NO es web, marcar como interactuado automáticamente**
       if (!PlatformDetector.requiresUserInteractionForAudio) {
         _userInteracted = true;
-        print('Auto-interacted: Windows/Android platform detected');
       } else {
         print('Waiting for user interaction: Web platform detected');
       }
-
-      print('AudioManager initialized successfully');
     } catch (e) {
-      print('Error initializing AudioManager: $e');
       _initialized = false;
     }
   }
@@ -49,7 +45,6 @@ class AudioManager {
     if (_userInteracted) return;
 
     _userInteracted = true;
-    print('User interaction detected - audio unlocked');
 
     // Si había música pendiente, reproducirla ahora
     if (_pendingMusicFile != null) {
@@ -58,13 +53,16 @@ class AudioManager {
     }
   }
 
-  // ============================================================================
-  // EFECTOS DE SONIDO
-  // ============================================================================
-
   /// Reproducir efecto de sonido
   void playSfx(String fileName, {double? volume}) {
     if (!_initialized) return;
+
+    // **ANDROID: NO REPRODUCIR EFECTOS DE SONIDO**
+    if (PlatformDetector.isAndroid) {
+      // Silenciosamente no hacer nada en Android
+
+      return;
+    }
 
     // Solo en web verificar interacción
     if (PlatformDetector.requiresUserInteractionForAudio && !_userInteracted) {
@@ -78,25 +76,18 @@ class AudioManager {
     }
   }
 
-  // ============================================================================
-  // MÚSICA DE FONDO
-  // ============================================================================
-
   /// Reproducir música en loop
   Future<void> playBgm(String fileName, {double? volume}) async {
     if (!_initialized) return;
 
-    print('Attempting to play BGM: $fileName');
-
     // **COMPORTAMIENTO DIFERENTE POR PLATAFORMA:**
     if (PlatformDetector.requiresUserInteractionForAudio && !_userInteracted) {
       // **WEB: Guardar como pendiente**
-      print('Web: Music queued (waiting for user interaction)');
       _pendingMusicFile = fileName;
       return;
     } else {
       // **WINDOWS/ANDROID: Reproducir inmediatamente**
-      print('Windows/Android: Playing music immediately');
+
       await _playBgmInternal(fileName, volume: volume);
     }
   }
@@ -114,7 +105,6 @@ class AudioManager {
         volume: (volume ?? 1.0) * musicVolume,
       );
       _musicPlaying = true;
-      print('Music playing: $fileName');
     } catch (e) {
       print('Error playing music $fileName: $e');
     }
@@ -148,14 +138,28 @@ class AudioManager {
   void resumeBgm() {
     try {
       FlameAudio.bgm.resume();
+      _musicPlaying = true;
     } catch (e) {
       print('Error resuming music: $e');
     }
   }
 
-  // ============================================================================
-  // LIMPIEZA
-  // ============================================================================
+  /// Verificar si se deben reproducir efectos de sonido
+  bool get shouldPlaySfx {
+    // En Android, NO reproducir efectos
+    if (PlatformDetector.isAndroid) return false;
+
+    // En web, solo si el usuario ha interactuado
+    if (PlatformDetector.isWeb) return _userInteracted;
+
+    // En otras plataformas, sí reproducir
+    return true;
+  }
+
+  /// Método específico para Android (solo música, sin efectos)
+  void playAndroidSfx(String fileName, {double? volume}) {
+    print('playAndroidSfx called but SFX disabled on Android: $fileName');
+  }
 
   /// Limpiar recursos de audio
   Future<void> dispose() async {

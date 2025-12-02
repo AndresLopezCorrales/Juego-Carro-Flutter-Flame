@@ -1,71 +1,108 @@
+// lib/components/ui/text_input.dart
 import 'package:flame/components.dart';
 import 'package:flame/events.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter/services.dart' as services;
 
-class TextInput extends PositionComponent with TapCallbacks, KeyboardHandler {
+class TextInput extends PositionComponent with TapCallbacks {
   final Function(String) onSubmitted;
-  final Function()? onCancel;
+  final VoidCallback? onCancel;
 
-  String _text = '';
-  bool _isActive = false;
-  final int maxLength = 20;
+  String text = '';
+  bool isFocused = false;
+  double cursorTimer = 0;
+  bool showCursor = true;
+
+  late TextPaint textPaint;
+  late TextPaint placeholderPaint;
+
+  // Cliente de entrada de texto para teclado móvil
+  services.TextInputConnection? _textInputConnection;
 
   TextInput({
     required this.onSubmitted,
     this.onCancel,
-    super.position,
-    super.size,
-  });
+    required Vector2 position,
+    required Vector2 size,
+  }) : super(position: position, size: size, anchor: Anchor.topLeft);
+
+  @override
+  Future<void> onLoad() async {
+    await super.onLoad();
+
+    textPaint = TextPaint(
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 20,
+        fontFamily: 'Arial',
+      ),
+    );
+
+    placeholderPaint = TextPaint(
+      style: const TextStyle(
+        color: Colors.grey,
+        fontSize: 20,
+        fontFamily: 'Arial',
+      ),
+    );
+  }
+
+  @override
+  void update(double dt) {
+    super.update(dt);
+
+    if (isFocused) {
+      cursorTimer += dt;
+      if (cursorTimer >= 0.5) {
+        showCursor = !showCursor;
+        cursorTimer = 0;
+      }
+    }
+  }
 
   @override
   void render(Canvas canvas) {
     super.render(canvas);
 
     // Fondo del input
-    canvas.drawRect(
-      Rect.fromLTWH(0, 0, size.x, size.y),
-      Paint()..color = Colors.black.withOpacity(0.3),
+    final inputRect = Rect.fromLTWH(0, 0, size.x, size.y);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(inputRect, const Radius.circular(8)),
+      Paint()
+        ..color = isFocused ? const Color(0xFF333333) : const Color(0xFF222222),
     );
 
     // Borde
-    canvas.drawRect(
-      Rect.fromLTWH(0, 0, size.x, size.y),
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(inputRect, const Radius.circular(8)),
       Paint()
-        ..color = _isActive ? const Color(0xFF4CAF50) : const Color(0xFF666666)
+        ..color = isFocused ? Colors.cyan : Colors.white54
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5,
+        ..strokeWidth = 2.0,
     );
 
     // Texto o placeholder
-    final displayText = _text.isEmpty ? 'Escribe aquí...' : _text;
-    final textColor = _text.isEmpty ? const Color(0xFF888888) : Colors.white;
+    final displayText = text.isEmpty ? 'Ingresa tu nombre...' : text;
+    final paint = text.isEmpty ? placeholderPaint : textPaint;
 
-    final textStyle = TextStyle(
-      color: textColor,
-      fontSize: 18,
-      fontFamily: 'Arial',
-    );
+    final textPosition = Vector2(15, (size.y - 20) / 2);
+    paint.render(canvas, displayText, textPosition);
 
-    final textPaint = TextPaint(style: textStyle);
-    final textPosition = Vector2(10, (size.y - 18) / 2);
-
-    textPaint.render(canvas, displayText, textPosition);
-
-    // Indicador de cursor cuando está activo
-    if (_isActive) {
-      final textWidth = _measureTextWidth(displayText, textStyle);
-      final cursorX = textPosition.x + textWidth;
-      canvas.drawRect(
-        Rect.fromLTWH(cursorX, textPosition.y, 2, 18),
-        Paint()..color = Colors.white,
+    // Cursor parpadeante
+    if (isFocused && showCursor && text.isNotEmpty) {
+      final textWidth = _measureTextWidth(text);
+      canvas.drawLine(
+        Offset(15 + textWidth + 2, (size.y - 20) / 2),
+        Offset(15 + textWidth + 2, (size.y + 20) / 2),
+        Paint()
+          ..color = Colors.cyan
+          ..strokeWidth = 2.0,
       );
     }
   }
 
-  // Método auxiliar para medir el ancho del texto
-  double _measureTextWidth(String text, TextStyle style) {
-    final textSpan = TextSpan(text: text, style: style);
+  double _measureTextWidth(String text) {
+    final textSpan = TextSpan(text: text, style: textPaint.style);
     final textPainter = TextPainter(
       text: textSpan,
       textDirection: TextDirection.ltr,
@@ -76,56 +113,140 @@ class TextInput extends PositionComponent with TapCallbacks, KeyboardHandler {
 
   @override
   void onTapDown(TapDownEvent event) {
-    super.onTapDown(event);
-    _isActive = true;
+    focus();
+  }
+
+  void focus() {
+    if (isFocused) return;
+
+    isFocused = true;
+    showCursor = true;
+    cursorTimer = 0;
+
+    // Abrir teclado virtual en móviles
+    _attachTextInputClient();
+  }
+
+  void unfocus() {
+    isFocused = false;
+    _detachTextInputClient();
+  }
+
+  void _attachTextInputClient() {
+    final client = _TextInputClient(
+      onTextChanged: (newText) {
+        text = newText;
+        if (text.length > 20) {
+          text = text.substring(0, 20);
+        }
+      },
+      onSubmitted: (submittedText) {
+        submit();
+      },
+    );
+
+    // Usar services.TextInput en lugar de TextInput para evitar conflicto
+    _textInputConnection = services.TextInput.attach(
+      client,
+      const services.TextInputConfiguration(
+        inputType: TextInputType.text,
+        inputAction: TextInputAction.done,
+        autocorrect: false,
+        enableSuggestions: false,
+      ),
+    );
+
+    _textInputConnection?.show();
+    _textInputConnection?.setEditingState(
+      TextEditingValue(
+        text: text,
+        selection: TextSelection.collapsed(offset: text.length),
+      ),
+    );
+  }
+
+  void _detachTextInputClient() {
+    _textInputConnection?.close();
+    _textInputConnection = null;
+  }
+
+  void submit() {
+    if (text.trim().length >= 3) {
+      unfocus();
+      onSubmitted(text.trim());
+    }
+  }
+
+  void cancel() {
+    unfocus();
+    text = '';
+    if (onCancel != null) {
+      onCancel!();
+    }
   }
 
   @override
-  bool onKeyEvent(KeyEvent event, Set<LogicalKeyboardKey> keysPressed) {
-    if (!_isActive) return false;
-
-    if (event is KeyDownEvent) {
-      if (event.logicalKey == LogicalKeyboardKey.backspace) {
-        if (_text.isNotEmpty) {
-          _text = _text.substring(0, _text.length - 1);
-          return true;
-        }
-      } else if (event.logicalKey == LogicalKeyboardKey.enter) {
-        if (_text.trim().isNotEmpty) {
-          onSubmitted(_text.trim());
-          _text = '';
-          _isActive = false;
-        }
-        return true;
-      } else if (event.logicalKey == LogicalKeyboardKey.escape) {
-        _isActive = false;
-        onCancel?.call();
-        return true;
-      } else if (event.character != null && event.character!.isNotEmpty) {
-        final char = event.character!;
-        if (_text.length < maxLength &&
-            RegExp(r'^[a-zA-Z0-9 ]$').hasMatch(char)) {
-          _text += char;
-          return true;
-        }
-      }
-    }
-    return false;
+  void onRemove() {
+    _detachTextInputClient();
+    super.onRemove();
   }
+}
 
-  void setActive(bool active) {
-    _isActive = active;
-  }
+// Cliente de entrada de texto personalizado
+class _TextInputClient implements services.TextInputClient {
+  final Function(String) onTextChanged;
+  final Function(String) onSubmitted;
 
-  // Método para enviar el texto (para usar desde el botón)
-  void submit() {
-    if (_text.trim().isNotEmpty) {
-      onSubmitted(_text.trim());
-      _text = '';
-      _isActive = false;
+  _TextInputClient({required this.onTextChanged, required this.onSubmitted});
+
+  @override
+  services.AutofillScope? get currentAutofillScope => null;
+
+  @override
+  TextEditingValue? get currentTextEditingValue => null;
+
+  @override
+  void performAction(services.TextInputAction action) {
+    if (action == services.TextInputAction.done) {
+      onSubmitted('');
     }
   }
 
-  // Getter para acceder al texto desde fuera
-  String get currentText => _text;
+  @override
+  void performPrivateCommand(String action, Map<String, dynamic> data) {}
+
+  @override
+  void showAutocorrectionPromptRect(int start, int end) {}
+
+  @override
+  void updateEditingValue(TextEditingValue value) {
+    onTextChanged(value.text);
+  }
+
+  @override
+  void updateFloatingCursor(services.RawFloatingCursorPoint point) {}
+
+  @override
+  void connectionClosed() {}
+
+  @override
+  void showToolbar() {}
+
+  @override
+  void insertTextPlaceholder(Size size) {}
+
+  @override
+  void removeTextPlaceholder() {}
+
+  @override
+  void performSelector(String selectorName) {}
+
+  @override
+  void insertContent(services.KeyboardInsertedContent content) {}
+
+  @override
+  void didChangeInputControl(
+    services.TextInputControl? oldControl,
+    services.TextInputControl? newControl,
+  ) {}
 }

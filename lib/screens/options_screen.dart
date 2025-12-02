@@ -387,6 +387,21 @@ class OptionsScreen extends PositionComponent
   @override
   void onTapDown(TapDownEvent event) {
     super.onTapDown(event);
+
+    // Si hay un input activo y se toca fuera de él, desenfocar
+    if (_textInput != null && _textInput!.isFocused) {
+      final tapPosition = event.localPosition;
+      final inputRect = Rect.fromLTWH(
+        _textInput!.position.x,
+        _textInput!.position.y - scrollOffset,
+        _textInput!.size.x,
+        _textInput!.size.y,
+      );
+
+      if (!inputRect.contains(tapPosition.toOffset())) {
+        _textInput!.unfocus();
+      }
+    }
   }
 
   @override
