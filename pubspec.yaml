@@ -70,27 +70,35 @@ flutter:
     - assets/images/cars/white_car.png
     - assets/images/cars/carro_bosque.png
     - assets/images/cars/ship.png
+    - assets/images/cars/carro_cyber.png
     - assets/images/escenarios/normal/side.png
     - assets/images/escenarios/normal/side_h.png
     - assets/images/escenarios/bosque/side_bosque.png
     - assets/images/escenarios/bosque/side_bosque_h.png
     - assets/images/escenarios/espacio/side_espacio.png
     - assets/images/escenarios/espacio/side_espacio_h.png
+    - assets/images/escenarios/cyber/side_cyber.png
+    - assets/images/escenarios/cyber/side_cyber_h.png
     - assets/images/carreteras/normal/calle.png
     - assets/images/carreteras/normal/calle_h.png
     - assets/images/carreteras/bosque/calle_bosque.png
     - assets/images/carreteras/bosque/calle_bosque_h.png
     - assets/images/carreteras/espacio/calle_espacio.png
     - assets/images/carreteras/espacio/calle_espacio_h.png
+    - assets/images/carreteras/cyber/calle_cyber.png
+    - assets/images/carreteras/cyber/calle_cyber_h.png
     - assets/images/obstaculos/normal/obstaculo.png
     - assets/images/obstaculos/bosque/obstaculo.png
     - assets/images/obstaculos/espacio/obstaculo.png
+    - assets/images/obstaculos/cyber/obstaculo.png
     - assets/images/power_ups/normal/gas.png
     - assets/images/power_ups/bosque/gas.png
     - assets/images/power_ups/espacio/gas.png
+    - assets/images/power_ups/cyber/gas.png
     - assets/images/power_ups/normal/dinero.png
     - assets/images/power_ups/bosque/dinero.png
     - assets/images/power_ups/espacio/dinero.png
+    - assets/images/power_ups/cyber/dinero.png
     - assets/images/explosion/
     - assets/.env
     - assets/audio/

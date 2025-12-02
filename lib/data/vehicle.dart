@@ -34,4 +34,15 @@ final List<Vehicle> availableVehicles = [
     gasSpritePath: "power_ups/espacio/gas.png",
     moneySpritePath: "power_ups/espacio/dinero.png",
   ),
+  Vehicle(
+    name: "Carro Cyber",
+    spritePath: "cars/carro_cyber.png",
+    roadSpritePath: "carreteras/cyber/calle_cyber.png",
+    sideSpritePath: "escenarios/cyber/side_cyber.png",
+    roadHorizontalSpritePath: "carreteras/cyber/calle_cyber_h.png",
+    sideHorizontalSpritePath: "escenarios/cyber/side_cyber_h.png",
+    obstacleSpritePath: "obstaculos/cyber/obstaculo.png",
+    gasSpritePath: "power_ups/cyber/gas.png",
+    moneySpritePath: "power_ups/cyber/dinero.png",
+  ),
 ];
