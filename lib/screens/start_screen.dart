@@ -2,12 +2,11 @@ import 'package:carreando/data/vehicle.dart';
 import 'package:carreando/screens/credits_screen.dart';
 import 'package:carreando/screens/leaderboard_screen.dart';
 import 'package:carreando/screens/options_screen.dart';
-import 'package:carreando/utils/platform_detector.dart'; // AGREGADO
+import 'package:carreando/utils/platform_detector.dart';
 import 'package:flame/components.dart';
 import 'package:flame/events.dart';
 import 'package:flame/palette.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/painting.dart';
 import '../main.dart';
 
 class StartScreen extends PositionComponent
@@ -16,9 +15,9 @@ class StartScreen extends PositionComponent
   late TextPaint subtitlePaint;
   late TextPaint buttonPaint;
   late TextPaint arrowPaint;
-  late TextPaint audioHintPaint; // AGREGADO: para mensaje de audio en web
+  late TextPaint audioHintPaint;
 
-  // AGREGAR: Sprite para el fondo
+  //Para Bg Image
   late Sprite backgroundSprite;
   bool backgroundLoaded = false;
 
@@ -34,7 +33,6 @@ class StartScreen extends PositionComponent
   late Rect _optionsButtonArea;
   late Rect _creditsButtonArea;
 
-  // AGREGADO: Bandera para mostrar mensaje de audio en web
   bool _showAudioHint = false;
 
   @override
@@ -49,30 +47,21 @@ class StartScreen extends PositionComponent
     await _loadBackground();
     await _loadVehicleSprites();
 
-    // AGREGADO: Verificar si necesita mostrar mensaje de audio (solo web)
     _checkAudioStatus();
   }
 
-  // AGREGAR: Método para cargar el fondo
   Future<void> _loadBackground() async {
     try {
-      // Cambia 'start_bg.jpg' por el nombre real de tu imagen
-      // Asegúrate de tener la imagen en tu carpeta assets
       backgroundSprite = await Sprite.load('fondo/start_bg.png');
       backgroundLoaded = true;
-      print('Fondo del StartScreen cargado exitosamente');
     } catch (e) {
-      print('Error cargando fondo: $e');
-      // Fallback: mantener fondo negro
       backgroundLoaded = false;
     }
   }
 
-  // AGREGADO: Método para verificar estado del audio
   void _checkAudioStatus() {
     if (PlatformDetector.isWeb && !gameRef.audioManager.userInteracted) {
       _showAudioHint = true;
-      print('Web: Mostrando mensaje de activación de audio');
     } else {
       _showAudioHint = false;
     }
@@ -83,7 +72,6 @@ class StartScreen extends PositionComponent
     final double screenWidth = size.x;
     final bool isHorizontal = screenWidth > screenHeight;
 
-    // AGREGADO: Si hay mensaje de audio, ajustar áreas
     final double audioHintHeight = _showAudioHint ? screenHeight * 0.08 : 0;
     final double startY = audioHintHeight;
 
@@ -223,7 +211,6 @@ class StartScreen extends PositionComponent
       ),
     );
 
-    // AGREGADO: Texto para mensaje de audio en web
     audioHintPaint = TextPaint(
       style: TextStyle(
         color: Colors.yellow, // Color amarillo para destacar
@@ -593,8 +580,6 @@ class StartScreen extends PositionComponent
 
   // AGREGADO: Manejar primera interacción en web
   void _handleFirstWebInteraction() {
-    print('🎵 Web: Primer tap detectado - activando audio');
-
     // Activar el audio
     gameRef.audioManager.markUserInteraction();
 
@@ -603,8 +588,6 @@ class StartScreen extends PositionComponent
 
     // Recalcular áreas sin el mensaje
     _calculateAreas();
-
-    print('✅ Audio activado correctamente');
   }
 
   void _onPlayButtonPressed() {

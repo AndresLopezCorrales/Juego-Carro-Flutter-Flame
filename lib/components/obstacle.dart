@@ -13,7 +13,6 @@ class Obstacle extends SpriteComponent
   final Player player;
   final bool isHorizontalMode;
 
-  // Agregar parámetro para el path del sprite
   final String obstacleSpritePath;
 
   bool hit = false;

@@ -215,19 +215,6 @@ class MyGame extends FlameGame
     add(gameOverScreen!);
   }
 
-  Future<void> _getGlobalHighScore() async {
-    try {
-      final topPuntajes = await supabaseService.obtenerTopPuntajes(limite: 1);
-      if (topPuntajes.isNotEmpty) {
-        globalHighScore = topPuntajes.first.puntos;
-      } else {
-        globalHighScore = score;
-      }
-    } catch (e) {
-      globalHighScore = score;
-    }
-  }
-
   void _clearAllScreens() {
     _resetGameState();
 
@@ -257,6 +244,20 @@ class MyGame extends FlameGame
 
     fuelManager = pickupManager = obstacleManager = player = null;
     gameHUD = gameOverScreen = startScreen = null;
+  }
+
+  //LLAMADO A SUPABASE
+  Future<void> _getGlobalHighScore() async {
+    try {
+      final topPuntajes = await supabaseService.obtenerTopPuntajes(limite: 1);
+      if (topPuntajes.isNotEmpty) {
+        globalHighScore = topPuntajes.first.puntos;
+      } else {
+        globalHighScore = score;
+      }
+    } catch (e) {
+      globalHighScore = score;
+    }
   }
 
   //ACCIONES DE ESTADO DEL JUEGO

@@ -1,7 +1,6 @@
 import 'package:carreando/managers/audio_manager.dart';
 import 'package:flame/components.dart';
 import 'package:flame/collisions.dart';
-import 'package:flame/game.dart';
 
 import '../main.dart';
 import 'player.dart';
@@ -11,7 +10,6 @@ class GoldCoin extends SpriteComponent
   static const double fallSpeed = 230;
   final bool isHorizontalMode;
 
-  // Agregar parámetro para el path del sprite
   final String moneySpritePath;
 
   GoldCoin({

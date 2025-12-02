@@ -1,4 +1,3 @@
-// lib/managers/audio_manager.dart
 import 'package:flame_audio/flame_audio.dart';
 import '../utils/platform_detector.dart';
 

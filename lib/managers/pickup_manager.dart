@@ -1,6 +1,5 @@
 import 'dart:math';
 import 'package:flame/components.dart';
-import 'package:flame/game.dart';
 
 import '../components/fuel_pickup.dart';
 import '../components/obstacle.dart';

@@ -1,4 +1,3 @@
-// lib/components/ui/text_input.dart
 import 'package:flame/components.dart';
 import 'package:flame/events.dart';
 import 'package:flutter/material.dart';
@@ -145,7 +144,6 @@ class TextInput extends PositionComponent with TapCallbacks {
       },
     );
 
-    // Usar services.TextInput en lugar de TextInput para evitar conflicto
     _textInputConnection = services.TextInput.attach(
       client,
       const services.TextInputConfiguration(

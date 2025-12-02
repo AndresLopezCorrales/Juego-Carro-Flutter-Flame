@@ -61,8 +61,6 @@ class FuelManager extends Component with HasGameRef<MyGame> {
     if (fuel < 0) {
       fuel = 0;
     }
-
-    print("NO -$amount fuel → $fuel");
   }
 
   // Sumar gasolina por pickup
@@ -72,8 +70,6 @@ class FuelManager extends Component with HasGameRef<MyGame> {
     if (fuel > maxFuel) {
       fuel = maxFuel;
     }
-
-    print("SI +$amount fuel → $fuel");
   }
 
   void reset() {

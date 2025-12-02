@@ -1,7 +1,6 @@
 import 'package:carreando/managers/audio_manager.dart';
 import 'package:flame/components.dart';
 import 'package:flame/collisions.dart';
-import 'package:flame/game.dart';
 
 import '../managers/fuel_manager.dart';
 import '../main.dart';
@@ -14,7 +13,6 @@ class FuelPickup extends SpriteComponent
   final FuelManager fuelManager;
   final bool isHorizontalMode;
 
-  // Agregar parámetro para el path del sprite
   final String gasSpritePath;
 
   FuelPickup({
