@@ -1,4 +1,5 @@
 import 'package:carreando/data/vehicle.dart';
+import 'package:carreando/screens/credits_screen.dart';
 import 'package:carreando/screens/leaderboard_screen.dart';
 import 'package:carreando/screens/options_screen.dart';
 import 'package:carreando/utils/platform_detector.dart'; // AGREGADO
@@ -584,7 +585,12 @@ class StartScreen extends PositionComponent
   }
 
   void _onCreditsButtonPressed() {
-    print('Créditos - Por implementar');
+    _goToCreditsScreen();
+  }
+
+  void _goToCreditsScreen() {
+    final creditsScreen = CreditsScreen();
+    gameRef.add(creditsScreen);
   }
 
   void _goToOptionsScreen() {
