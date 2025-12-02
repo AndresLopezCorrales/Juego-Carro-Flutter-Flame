@@ -18,6 +18,10 @@ class StartScreen extends PositionComponent
   late TextPaint arrowPaint;
   late TextPaint audioHintPaint; // AGREGADO: para mensaje de audio en web
 
+  // AGREGAR: Sprite para el fondo
+  late Sprite backgroundSprite;
+  bool backgroundLoaded = false;
+
   // Lista para almacenar los sprites de los vehículos
   List<Sprite> vehicleSprites = [];
   bool spritesLoaded = false;
@@ -40,10 +44,28 @@ class StartScreen extends PositionComponent
     position = Vector2.zero();
     _setupTextPaints();
     _calculateAreas();
+
+    // CARGAR FONDO PRIMERO
+    await _loadBackground();
     await _loadVehicleSprites();
 
     // AGREGADO: Verificar si necesita mostrar mensaje de audio (solo web)
     _checkAudioStatus();
+  }
+
+  // AGREGAR: Método para cargar el fondo
+  Future<void> _loadBackground() async {
+    try {
+      // Cambia 'start_bg.jpg' por el nombre real de tu imagen
+      // Asegúrate de tener la imagen en tu carpeta assets
+      backgroundSprite = await Sprite.load('fondo/start_bg.png');
+      backgroundLoaded = true;
+      print('Fondo del StartScreen cargado exitosamente');
+    } catch (e) {
+      print('Error cargando fondo: $e');
+      // Fallback: mantener fondo negro
+      backgroundLoaded = false;
+    }
   }
 
   // AGREGADO: Método para verificar estado del audio
@@ -238,12 +260,25 @@ class StartScreen extends PositionComponent
   void render(Canvas canvas) {
     super.render(canvas);
 
-    // Fondo semitransparente
-    final backgroundRect = Rect.fromLTWH(0, 0, size.x, size.y);
-    canvas.drawRect(
-      backgroundRect,
-      Paint()..color = BasicPalette.black.color.withOpacity(0.8),
-    );
+    // FONDO CON IMAGEN
+    if (backgroundLoaded) {
+      // Renderizar la imagen de fondo ocupando toda la pantalla
+      backgroundSprite.render(canvas, position: Vector2.zero(), size: size);
+
+      // Capa semitransparente oscura encima para mejorar legibilidad
+      final overlayRect = Rect.fromLTWH(0, 0, size.x, size.y);
+      canvas.drawRect(
+        overlayRect,
+        Paint()..color = BasicPalette.black.color.withOpacity(0.7),
+      );
+    } else {
+      // Fallback: fondo negro semitransparente (comportamiento original)
+      final backgroundRect = Rect.fromLTWH(0, 0, size.x, size.y);
+      canvas.drawRect(
+        backgroundRect,
+        Paint()..color = BasicPalette.black.color.withOpacity(0.7),
+      );
+    }
 
     // AGREGADO: Renderizar mensaje de audio si es necesario
     if (_showAudioHint) {
@@ -279,7 +314,7 @@ class StartScreen extends PositionComponent
     canvas.drawRRect(
       RRect.fromRectAndRadius(backgroundRect, Radius.circular(20)),
       Paint()
-        ..color = Colors.black.withOpacity(0.7)
+        ..color = Colors.black.withOpacity(0.8)
         ..maskFilter = MaskFilter.blur(BlurStyle.normal, 4.0),
     );
 
@@ -356,7 +391,7 @@ class StartScreen extends PositionComponent
           RRect.fromRectAndRadius(leftArrowBg, Radius.circular(12)),
           Paint()
             ..color = Color(0xFF444444)
-                .withOpacity(0.6) // Más transparente
+                .withOpacity(0.8) // Más transparente
             ..maskFilter = MaskFilter.blur(
               BlurStyle.normal,
               4.0,
@@ -385,7 +420,7 @@ class StartScreen extends PositionComponent
           RRect.fromRectAndRadius(rightArrowBg, Radius.circular(12)),
           Paint()
             ..color = Color(0xFF444444)
-                .withOpacity(0.6) // Más transparente
+                .withOpacity(0.8) // Más transparente
             ..maskFilter = MaskFilter.blur(
               BlurStyle.normal,
               4.0,
@@ -425,7 +460,7 @@ class StartScreen extends PositionComponent
         Paint()
           ..color = isSelected
               ? Color(0xFFFFD700)
-              : BasicPalette.white.color.withOpacity(0.5),
+              : BasicPalette.white.color.withOpacity(0.8),
       );
     }
   }
@@ -486,7 +521,7 @@ class StartScreen extends PositionComponent
       RRect.fromRectAndRadius(buttonRect, buttonRadius),
       Paint()
         ..color = BasicPalette.white.color
-            .withOpacity(0.3) // Borde más transparente
+            .withOpacity(0.8) // Borde más transparente
         ..style = PaintingStyle.stroke
         ..strokeWidth = buttonHeight * 0.03, // Borde más delgado
     );
