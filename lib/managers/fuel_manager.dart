@@ -12,8 +12,7 @@ class FuelManager extends Component with HasGameRef<MyGame> {
   double get fuelPercent => fuel / maxFuel;
 
   // Gasolina que drena por segundo en carriles extremos
-  double extremeLaneFuelDrain = 0.8;
-  double _extremeLaneTimer = 0.0;
+  double extremeLaneFuelDrain = 5;
 
   bool _explosionShown = false; // Para evitar múltiples explosiones
 
@@ -24,17 +23,10 @@ class FuelManager extends Component with HasGameRef<MyGame> {
     // Drenaje normal de gasolina
     fuel -= drainRate * dt;
 
-    // Drenar gasolina adicional en carriles extremos
+    // Drenar gasolina adicional en carriles extremos (CONTINUO)
     if (game.player!.isOnExtremeLane) {
-      _extremeLaneTimer += dt;
-      if (_extremeLaneTimer >= 1.0) {
-        fuel -= extremeLaneFuelDrain;
-        _extremeLaneTimer = 0.0;
-
-        //print("Carril extremo - Gasolina: ${fuel.toStringAsFixed(1)}");
-      }
-    } else {
-      _extremeLaneTimer = 0.0;
+      // Aplica el drenaje adicional continuamente
+      fuel -= extremeLaneFuelDrain * dt;
     }
 
     // Asegurar que no sea negativo

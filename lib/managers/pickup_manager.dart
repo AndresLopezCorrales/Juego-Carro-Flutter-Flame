@@ -26,7 +26,7 @@ class PickupManager extends Component with HasGameRef<MyGame> {
     required this.player,
     required this.fuelManager,
     this.isHorizontalMode = false,
-    this.spawnInterval = 1.4,
+    this.spawnInterval = 1.0,
   });
 
   @override

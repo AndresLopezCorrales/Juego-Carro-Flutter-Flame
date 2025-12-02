@@ -1,12 +1,10 @@
 import 'package:carreando/models/vehicle.dart';
 import 'package:flame/components.dart';
-import 'package:flame/events.dart';
 import 'package:flame/collisions.dart';
 import 'package:flutter/services.dart';
 import '../main.dart';
 
-class Player extends SpriteComponent
-    with HasGameRef<MyGame>, TapCallbacks, KeyboardHandler {
+class Player extends SpriteComponent with HasGameRef<MyGame>, KeyboardHandler {
   final Vehicle vehicle;
   Player({required this.vehicle}) : super(anchor: Anchor.center) {
     priority = 100;
@@ -159,15 +157,12 @@ class Player extends SpriteComponent
     if (canMove && lane < lanePositions.length - 1) lane++;
   }
 
-  @override
-  void onTapDown(TapDownEvent event) {
+  // Método público para manejar toques desde el juego
+  void handleTap(double touchX, double touchY) {
     if (!canMove) return;
 
-    final touchX = event.localPosition.x;
-    final mid = gameRef.size.x / 2;
-
     if (gameRef.isHorizontalMode) {
-      final touchY = event.localPosition.y;
+      // En horizontal: arriba/abajo de la pantalla
       final midY = gameRef.size.y / 2;
 
       if (touchY < midY) {
@@ -176,7 +171,10 @@ class Player extends SpriteComponent
         moveDown();
       }
     } else {
-      if (touchX < mid) {
+      // En vertical: izquierda/derecha de la pantalla
+      final midX = gameRef.size.x / 2;
+
+      if (touchX < midX) {
         moveLeft();
       } else {
         moveRight();

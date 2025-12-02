@@ -17,7 +17,7 @@ class ObstacleManager extends Component with HasGameRef<MyGame> {
   final bool isHorizontalMode;
 
   double spawnTimer = 0;
-  double spawnInterval = 0.25;
+  double spawnInterval = 0.18;
 
   ObstacleManager({
     required this.lanes,

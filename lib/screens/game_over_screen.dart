@@ -144,19 +144,16 @@ class GameOverScreen extends PositionComponent
     scorePaint.render(canvas, scoreText, Vector2(scoreX, scoreY));
 
     // High Score - Centrado
-    /*final highScoreText = 'Mejor Puntuación: ${gameRef.score}';
+    final highScoreText = 'Mejor Puntuación Global: ${gameRef.globalHighScore}';
     final highScoreSize = _measureText(highScoreText, highScorePaint);
     final highScoreX = (size.x - highScoreSize.x) / 2;
     final highScoreY = scoreY + scoreSize.y + size.y * 0.04;
-    
 
     highScorePaint.render(
       canvas,
       highScoreText,
       Vector2(highScoreX, highScoreY),
     );
-
-    */
 
     // Botón para regresar al menú - Centrado
     _renderButton(canvas, 'VOLVER AL MENÚ', size.y * 0.65, Color(0xFF2196F3));

@@ -5,6 +5,8 @@ import 'package:carreando/managers/usuario_manager.dart';
 import 'package:carreando/models/vehicle.dart';
 import 'package:carreando/screens/game_over_screen.dart';
 import 'package:carreando/screens/start_screen.dart';
+import 'package:carreando/services/supabase_service.dart';
+import 'package:flame/events.dart';
 import 'package:flame/game.dart';
 import 'package:flame/components.dart';
 import 'package:flame/input.dart';
@@ -37,7 +39,7 @@ void main() async {
 }
 
 class MyGame extends FlameGame
-    with HasCollisionDetection, HasKeyboardHandlerComponents {
+    with HasCollisionDetection, HasKeyboardHandlerComponents, TapCallbacks {
   // Configuración de carriles
   late double laneWidth;
   late double sideWidth;
@@ -92,6 +94,21 @@ class MyGame extends FlameGame
 
   final audioManager = AudioManager();
 
+  // Agrega una variable para el high score global
+  int globalHighScore = 0;
+  final SupabaseService supabaseService = SupabaseService();
+
+  @override
+  void onTapDown(TapDownEvent event) {
+    super.onTapDown(event);
+
+    // Solo manejar toques cuando el juego está activo
+    if (_gameStarted && !_gameOver && player != null) {
+      final touchPosition = event.localPosition;
+      player!.handleTap(touchPosition.x, touchPosition.y);
+    }
+  }
+
   @override
   Future<void> onLoad() async {
     await super.onLoad();
@@ -114,11 +131,14 @@ class MyGame extends FlameGame
     super.update(dt);
 
     if (_gameStarted && !_gameOver) {
+      // Calcular scroll speed actualizado con la dificultad
+      double currentScrollSpeed = scrollSpeed * difficultyMultiplier;
+
       // Scroll según el modo
       if (_isHorizontalMode) {
-        _scrollHorizontalBackgrounds(dt);
+        _scrollHorizontalBackgrounds(dt, currentScrollSpeed);
       } else {
-        _scrollVerticalBackgrounds(dt);
+        _scrollVerticalBackgrounds(dt, currentScrollSpeed);
       }
 
       // Dificultad
@@ -158,14 +178,33 @@ class MyGame extends FlameGame
     _showStartScreen();
   }
 
-  void _showGameOverScreen() {
+  void _showGameOverScreen() async {
     _stopGameLogic();
+
+    // Obtener el mejor puntaje global
+    await _getGlobalHighScore();
+
     // Guardar puntaje si hay usuario
     if (usuarioManager.hayUsuario) {
       usuarioManager.guardarPuntajeActual(score);
     }
+
     gameOverScreen = GameOverScreen();
     add(gameOverScreen!);
+  }
+
+  Future<void> _getGlobalHighScore() async {
+    try {
+      final topPuntajes = await supabaseService.obtenerTopPuntajes(limite: 1);
+      if (topPuntajes.isNotEmpty) {
+        globalHighScore = topPuntajes.first.puntos;
+      } else {
+        globalHighScore = score;
+      }
+    } catch (e) {
+      print('Error obteniendo high score: $e');
+      globalHighScore = score;
+    }
   }
 
   void _clearAllScreens() {
@@ -499,19 +538,19 @@ class MyGame extends FlameGame
     add(centerHorizontalBg2!);
   }
 
-  void _scrollHorizontalBackgrounds(double dt) {
+  void _scrollHorizontalBackgrounds(double dt, double currentSpeed) {
     // Scroll para fondos horizontales
-    if (topBg1 != null) _scrollHorizontal(topBg1!, dt);
-    if (topBg2 != null) _scrollHorizontal(topBg2!, dt);
+    if (topBg1 != null) _scrollHorizontal(topBg1!, dt, currentSpeed);
+    if (topBg2 != null) _scrollHorizontal(topBg2!, dt, currentSpeed);
     if (centerHorizontalBg1 != null)
-      _scrollHorizontal(centerHorizontalBg1!, dt);
+      _scrollHorizontal(centerHorizontalBg1!, dt, currentSpeed);
     if (centerHorizontalBg2 != null)
-      _scrollHorizontal(centerHorizontalBg2!, dt);
+      _scrollHorizontal(centerHorizontalBg2!, dt, currentSpeed);
   }
 
-  void _scrollHorizontal(SpriteComponent bg, double dt) {
+  void _scrollHorizontal(SpriteComponent bg, double dt, double speed) {
     // Mover de derecha a izquierda
-    bg.x -= scrollSpeed * dt;
+    bg.x -= speed * dt;
 
     // Manejo mejorado de bordes
     if (bg.x <= -size.x) {
@@ -524,15 +563,15 @@ class MyGame extends FlameGame
     }
   }
 
-  void _scrollVerticalBackgrounds(double dt) {
-    if (leftBg1 != null) _scrollVertical(leftBg1!, dt);
-    if (leftBg2 != null) _scrollVertical(leftBg2!, dt);
-    if (centerBg1 != null) _scrollVertical(centerBg1!, dt);
-    if (centerBg2 != null) _scrollVertical(centerBg2!, dt);
+  void _scrollVerticalBackgrounds(double dt, double currentSpeed) {
+    if (leftBg1 != null) _scrollVertical(leftBg1!, dt, currentSpeed);
+    if (leftBg2 != null) _scrollVertical(leftBg2!, dt, currentSpeed);
+    if (centerBg1 != null) _scrollVertical(centerBg1!, dt, currentSpeed);
+    if (centerBg2 != null) _scrollVertical(centerBg2!, dt, currentSpeed);
   }
 
-  void _scrollVertical(SpriteComponent bg, double dt) {
-    bg.y += scrollSpeed * dt;
+  void _scrollVertical(SpriteComponent bg, double dt, double speed) {
+    bg.y += speed * dt;
 
     if (bg.y >= size.y) {
       bg.y = bg.y - (2 * size.y);
