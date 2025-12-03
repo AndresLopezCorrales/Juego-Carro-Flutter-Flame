@@ -1,16 +1,51 @@
 # Slide Road
 
-A new Flutter project.
+Slide Road es una aplicación creada en Flutter que simula un juego tipo "slider" donde un auto se desplaza entre carriles a través de distintos escenarios.
+
+---
+
+## Tecnologías Utilizadas
+- Flutter SDK  
+- Flame Game Engine  
+- Supabase  
+- Visual Studio Code  
+
+---
+
+## Créditos
+
+### Creadores del Juego
+- Andrés López Corrales  
+- Ingrid Z. Mendoza Dórame  
+- Sebastián Pérez González  
+
+### Agradecimientos Especiales
+- Prof. Federico Miguel Cirett Galán  
+- Compañeros de clase — por el apoyo  
+
+### Recursos y Referencias
+- Documentación oficial de Flame  
+- Tutoriales de desarrollo de juegos  
+- [OpenGameArt.org](https://opengameart.org/)  
+- [Freepik.com](https://www.freepik.com/)  
+- [Shutterstock.com](https://www.shutterstock.com/)  
+- [Freesound.org](https://freesound.org/)  
+
+### Inspiración
+- Crear un juego en Flutter–Flame  
+
+### GitHub
+- [Andrés López Corrales](https://github.com/AndresLopezCorrales)  
+- [Ingrid Z. Mendoza Dórame](https://github.com/ingridzmendoza)  
+- [Sebastián Pérez González](https://github.com/SeaBassy4)  
+
+---
 
 ## Getting Started
 
-This project is a starting point for a Flutter application.
+Recursos para comenzar con Flutter:  
+- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)  
+- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)  
 
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Documentación completa:  
+- <https://docs.flutter.dev/>
