@@ -3,7 +3,7 @@ import 'package:flame/events.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' as services;
 
-class TextInput extends PositionComponent with TapCallbacks {
+class TextInputMobile extends PositionComponent with TapCallbacks {
   final Function(String) onSubmitted;
   final VoidCallback? onCancel;
 
@@ -15,10 +15,10 @@ class TextInput extends PositionComponent with TapCallbacks {
   late TextPaint textPaint;
   late TextPaint placeholderPaint;
 
-  // Cliente de entrada de texto para teclado móvil
   services.TextInputConnection? _textInputConnection;
+  _TextInputClient? _client;
 
-  TextInput({
+  TextInputMobile({
     required this.onSubmitted,
     this.onCancel,
     required Vector2 position,
@@ -63,7 +63,6 @@ class TextInput extends PositionComponent with TapCallbacks {
   void render(Canvas canvas) {
     super.render(canvas);
 
-    // Fondo del input
     final inputRect = Rect.fromLTWH(0, 0, size.x, size.y);
     canvas.drawRRect(
       RRect.fromRectAndRadius(inputRect, const Radius.circular(8)),
@@ -71,7 +70,6 @@ class TextInput extends PositionComponent with TapCallbacks {
         ..color = isFocused ? const Color(0xFF333333) : const Color(0xFF222222),
     );
 
-    // Borde
     canvas.drawRRect(
       RRect.fromRectAndRadius(inputRect, const Radius.circular(8)),
       Paint()
@@ -80,16 +78,14 @@ class TextInput extends PositionComponent with TapCallbacks {
         ..strokeWidth = 2.0,
     );
 
-    // Texto o placeholder
     final displayText = text.isEmpty ? 'Ingresa tu nombre...' : text;
     final paint = text.isEmpty ? placeholderPaint : textPaint;
 
     final textPosition = Vector2(15, (size.y - 20) / 2);
     paint.render(canvas, displayText, textPosition);
 
-    // Cursor parpadeante
-    if (isFocused && showCursor && text.isNotEmpty) {
-      final textWidth = _measureTextWidth(text);
+    if (isFocused && showCursor) {
+      final textWidth = text.isEmpty ? 0.0 : _measureTextWidth(text);
       canvas.drawLine(
         Offset(15 + textWidth + 2, (size.y - 20) / 2),
         Offset(15 + textWidth + 2, (size.y + 20) / 2),
@@ -122,56 +118,69 @@ class TextInput extends PositionComponent with TapCallbacks {
     showCursor = true;
     cursorTimer = 0;
 
-    // Abrir teclado virtual en móviles
     _attachTextInputClient();
   }
 
   void unfocus() {
-    isFocused = false;
-    _detachTextInputClient();
+    if (isFocused) {
+      isFocused = false;
+      _detachTextInputClient();
+    }
+  }
+
+  void _updateText(String newText) {
+    if (newText.length > 20) {
+      newText = newText.substring(0, 20);
+    }
+    text = newText;
   }
 
   void _attachTextInputClient() {
-    final client = _TextInputClient(
+    _client = _TextInputClient(
       onTextChanged: (newText) {
-        text = newText;
-        if (text.length > 20) {
-          text = text.substring(0, 20);
-        }
+        _updateText(newText);
       },
       onSubmitted: (submittedText) {
         submit();
       },
+      getCurrentText: () => text,
     );
 
     _textInputConnection = services.TextInput.attach(
-      client,
+      _client!,
       const services.TextInputConfiguration(
-        inputType: TextInputType.text,
-        inputAction: TextInputAction.done,
+        inputType: services.TextInputType.text,
+        inputAction: services.TextInputAction.done,
         autocorrect: false,
         enableSuggestions: false,
       ),
     );
 
+    // Asignar la conexión al cliente DESPUÉS de crearla
+    _client!._textInputConnection = _textInputConnection;
+
     _textInputConnection?.show();
     _textInputConnection?.setEditingState(
-      TextEditingValue(
+      services.TextEditingValue(
         text: text,
-        selection: TextSelection.collapsed(offset: text.length),
+        selection: services.TextSelection.collapsed(offset: text.length),
       ),
     );
   }
 
   void _detachTextInputClient() {
-    _textInputConnection?.close();
-    _textInputConnection = null;
+    if (_textInputConnection != null) {
+      _textInputConnection?.close();
+      _textInputConnection = null;
+      _client = null;
+    }
   }
 
   void submit() {
-    if (text.trim().length >= 3) {
+    final trimmedText = text.trim();
+    if (trimmedText.length >= 3) {
       unfocus();
-      onSubmitted(text.trim());
+      onSubmitted(trimmedText);
     }
   }
 
@@ -190,24 +199,75 @@ class TextInput extends PositionComponent with TapCallbacks {
   }
 }
 
-// Cliente de entrada de texto personalizado
 class _TextInputClient implements services.TextInputClient {
   final Function(String) onTextChanged;
   final Function(String) onSubmitted;
+  final String Function() getCurrentText;
 
-  _TextInputClient({required this.onTextChanged, required this.onSubmitted});
+  services.TextEditingValue _currentValue = const services.TextEditingValue();
+  services.TextInputConnection? _textInputConnection;
+
+  _TextInputClient({
+    required this.onTextChanged,
+    required this.onSubmitted,
+    required this.getCurrentText,
+  });
 
   @override
   services.AutofillScope? get currentAutofillScope => null;
 
   @override
-  TextEditingValue? get currentTextEditingValue => null;
+  services.TextEditingValue? get currentTextEditingValue => _currentValue;
 
   @override
   void performAction(services.TextInputAction action) {
     if (action == services.TextInputAction.done) {
-      onSubmitted('');
+      onSubmitted(getCurrentText());
     }
+  }
+
+  @override
+  void updateEditingValue(services.TextEditingValue value) {
+    // PRIMERO: Actualizar el valor actual con lo que viene del teclado
+    _currentValue = value;
+
+    String newText = value.text;
+    bool needsSync = false;
+
+    // Validar caracteres
+    final validPattern = RegExp(r'^[a-zA-Z0-9\s\-_\.áéíóúÁÉÍÓÚñÑüÜ]*$');
+    if (!validPattern.hasMatch(newText)) {
+      newText = newText
+          .split('')
+          .where((char) {
+            return RegExp(r'^[a-zA-Z0-9\s\-_\.áéíóúÁÉÍÓÚñÑüÜ]$').hasMatch(char);
+          })
+          .join('');
+      needsSync = true;
+    }
+
+    // Límite de longitud
+    if (newText.length > 20) {
+      newText = newText.substring(0, 20);
+      needsSync = true;
+    }
+
+    // Si el texto cambió por validación, sincronizar de vuelta
+    if (needsSync && newText != value.text) {
+      _currentValue = services.TextEditingValue(
+        text: newText,
+        selection: services.TextSelection.collapsed(offset: newText.length),
+      );
+      // Sincronizar con el teclado virtual
+      _textInputConnection?.setEditingState(_currentValue);
+    }
+
+    onTextChanged(newText);
+  }
+
+  @override
+  void connectionClosed() {
+    _currentValue = const services.TextEditingValue();
   }
 
   @override
@@ -217,15 +277,7 @@ class _TextInputClient implements services.TextInputClient {
   void showAutocorrectionPromptRect(int start, int end) {}
 
   @override
-  void updateEditingValue(TextEditingValue value) {
-    onTextChanged(value.text);
-  }
-
-  @override
   void updateFloatingCursor(services.RawFloatingCursorPoint point) {}
-
-  @override
-  void connectionClosed() {}
 
   @override
   void showToolbar() {}

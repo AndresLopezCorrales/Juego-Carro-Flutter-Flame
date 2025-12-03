@@ -3,13 +3,17 @@ import 'package:flame/events.dart';
 import 'package:flutter/material.dart';
 import '../main.dart';
 import '../components/ui/custom_button.dart';
-import '../components/ui/text_input.dart';
+import '../components/ui/text_input_mobile.dart';
+import '../components/ui/text_input_desktop.dart';
+import '../utils/platform_detector.dart';
 
 class OptionsScreen extends PositionComponent
     with HasGameRef<MyGame>, TapCallbacks, DragCallbacks {
   final List<PositionComponent> _uiComponents = [];
   bool _showingUserInput = false;
-  TextInput? _textInput;
+
+  // Usar PositionComponent como tipo base para ambos inputs
+  PositionComponent? _textInput;
 
   // Variables para scroll
   double scrollOffset = 0.0;
@@ -123,13 +127,24 @@ class OptionsScreen extends PositionComponent
     );
     currentY += spacing;
 
-    // Input de texto
-    _textInput = TextInput(
-      onSubmitted: _acceptUser,
-      onCancel: _showMainOptions,
-      position: Vector2(screenCenterX - buttonWidth / 2, currentY),
-      size: Vector2(buttonWidth, 50),
-    );
+    // Input de texto - SELECCIONAR SEGÚN PLATAFORMA
+    if (PlatformDetector.isMobile) {
+      // Android/iOS - Usa TextInputMobile
+      _textInput = TextInputMobile(
+        onSubmitted: _acceptUser,
+        onCancel: _showMainOptions,
+        position: Vector2(screenCenterX - buttonWidth / 2, currentY),
+        size: Vector2(buttonWidth, 50),
+      );
+    } else {
+      // Desktop/Web - Usa TextInputDesktop
+      _textInput = TextInputDesktop(
+        onSubmitted: _acceptUser,
+        onCancel: _showMainOptions,
+        position: Vector2(screenCenterX - buttonWidth / 2, currentY),
+        size: Vector2(buttonWidth, 50),
+      );
+    }
     _addComponent(_textInput!);
     currentY += spacing;
 
@@ -141,7 +156,7 @@ class OptionsScreen extends PositionComponent
         position: Vector2(screenCenterX - buttonWidth / 2, currentY),
         width: buttonWidth,
         height: 50,
-        onPressed: () => _textInput?.submit(),
+        onPressed: _submitInput,
       ),
     );
     currentY += spacing;
@@ -171,6 +186,34 @@ class OptionsScreen extends PositionComponent
     // Calcular altura total del contenido
     contentHeight = currentY;
     _calcularMaxScroll();
+  }
+
+  // Método helper para llamar submit en el input correcto
+  void _submitInput() {
+    if (_textInput is TextInputMobile) {
+      (_textInput as TextInputMobile).submit();
+    } else if (_textInput is TextInputDesktop) {
+      (_textInput as TextInputDesktop).submit();
+    }
+  }
+
+  // Método helper para verificar si el input está enfocado
+  bool _isInputFocused() {
+    if (_textInput is TextInputMobile) {
+      return (_textInput as TextInputMobile).isFocused;
+    } else if (_textInput is TextInputDesktop) {
+      return (_textInput as TextInputDesktop).isFocused;
+    }
+    return false;
+  }
+
+  // Método helper para desenfocar el input
+  void _unfocusInput() {
+    if (_textInput is TextInputMobile) {
+      (_textInput as TextInputMobile).unfocus();
+    } else if (_textInput is TextInputDesktop) {
+      (_textInput as TextInputDesktop).unfocus();
+    }
   }
 
   void _calcularMaxScroll() {
@@ -388,7 +431,7 @@ class OptionsScreen extends PositionComponent
     super.onTapDown(event);
 
     // Si hay un input activo y se toca fuera de él, desenfocar
-    if (_textInput != null && _textInput!.isFocused) {
+    if (_textInput != null && _isInputFocused()) {
       final tapPosition = event.localPosition;
       final inputRect = Rect.fromLTWH(
         _textInput!.position.x,
@@ -398,7 +441,7 @@ class OptionsScreen extends PositionComponent
       );
 
       if (!inputRect.contains(tapPosition.toOffset())) {
-        _textInput!.unfocus();
+        _unfocusInput();
       }
     }
   }
@@ -406,10 +449,5 @@ class OptionsScreen extends PositionComponent
   @override
   void update(double dt) {
     super.update(dt);
-
-    // Aplicar offset de scroll a todos los componentes
-    for (final component in _uiComponents) {
-      if (component.parent != null) {}
-    }
   }
 }
